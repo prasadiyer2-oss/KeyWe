@@ -23,6 +23,7 @@ use App\Orchid\Screens\BuilderLeadListScreen;
 use App\Orchid\Screens\BuilderSubscriptionScreen;
 use App\Orchid\Screens\BuilderProfileScreen;
 use App\Orchid\Screens\AdminBuilderVerificationScreen;
+use App\Orchid\Screens\BuilderPropertyListScreen;
 use Illuminate\Support\Facades\Route;
 use Tabuna\Breadcrumbs\Trail;
 
@@ -79,6 +80,12 @@ Route::screen('admin/verification', AdminBuilderVerificationScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.main')
         ->push(__('Builder Verification'), route('platform.admin.verification')));
+        
+Route::screen('properties', BuilderPropertyListScreen::class)
+    ->name('platform.builder.properties')
+    ->breadcrumbs(fn ($trail) => $trail
+        ->parent('platform.main')
+        ->push('Properties', route('platform.builder.properties')));
 
 // Platform > System > Users > User
 Route::screen('users/{user}/edit', UserEditScreen::class)

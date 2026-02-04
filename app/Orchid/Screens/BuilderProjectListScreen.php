@@ -2,6 +2,8 @@
 
 namespace App\Orchid\Screens;
 
+use App\Models\Project; // <--- Import Model
+use Illuminate\Http\Request;
 use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
@@ -9,51 +11,22 @@ use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Select;
-use Orchid\Screen\Repository;
 use Orchid\Support\Color;
 use Orchid\Support\Facades\Toast;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class BuilderProjectListScreen extends Screen
 {
     /**
      * Fetch data to be displayed on the screen.
-     *
-     * @return array
      */
     public function query(): iterable
     {
-        // Dummy data simulating FR-D-01 Project Listings
+        // Fetch projects for the currently logged-in builder
         return [
-            'projects' => [
-                new Repository([
-                    'id' => 1,
-                    'name' => 'Green Valley Phase 1',
-                    'location' => 'Navi Mumbai',
-                    'units' => 120,
-                    'status' => 'Ongoing',
-                    'verification' => 'Verified', // FR-L-02
-                    'views' => '1.2k',
-                ]),
-                new Repository([
-                    'id' => 2,
-                    'name' => 'Skyline Towers',
-                    'location' => 'Thane',
-                    'units' => 45,
-                    'status' => 'Completed',
-                    'verification' => 'Pending',
-                    'views' => '850',
-                ]),
-                new Repository([
-                    'id' => 3,
-                    'name' => 'Oceanic Heights',
-                    'location' => 'Bandra West',
-                    'units' => 200,
-                    'status' => 'Upcoming',
-                    'verification' => 'Draft',
-                    'views' => '0',
-                ]),
-            ]
+            'projects' => Project::where('user_id', Auth::id())
+                ->latest()
+                ->paginate(10) // Standard pagination
         ];
     }
 
@@ -65,84 +38,81 @@ class BuilderProjectListScreen extends Screen
         return 'My Projects';
     }
 
-    /**
-     * The description is displayed on the user's screen under the heading
-     */
     public function description(): ?string
     {
         return 'Manage your property listings and track verification status.';
     }
 
-    /**
-     * Button commands.
-     */
     public function commandBar(): iterable
     {
         return [
-            // Primary Action: Add Project (FR-D-01)
             ModalToggle::make('Add New Project')
                 ->modal('createProjectModal')
                 ->method('createProject')
                 ->icon('plus')
-                ->type(Color::SUCCESS), // KeyWe Green for Primary Actions 
+                ->type(Color::SUCCESS),
         ];
     }
 
-    /**
-     * Views.
-     */
     public function layout(): iterable
     {
         return [
-            // 1. The Project List Table
+            // 1. Project List Table (From DB)
             Layout::table('projects', [
                 TD::make('name', 'Project Name')
                     ->sort()
-                    ->render(fn ($project) => "<strong>{$project['name']}</strong>"),
+                    ->render(fn (Project $project) => "<strong>{$project->name}</strong>"),
                 
-                TD::make('location', 'Location'),
+                TD::make('location', 'Location')
+                    ->sort(),
 
                 TD::make('status', 'Status')
-                    ->render(function ($project) {
-                        $color = match ($project['status']) {
+                    ->sort()
+                    ->render(function (Project $project) {
+                        $color = match ($project->status) {
                             'Ongoing' => 'text-primary',
                             'Completed' => 'text-success',
                             'Upcoming' => 'text-warning',
                             default => 'text-muted',
                         };
-                        return "<span class='{$color}'>● {$project['status']}</span>";
+                        return "<span class='{$color}'>● {$project->status}</span>";
                     }),
 
-                TD::make('verification', 'KeyWe Verification') // FR-L-02 Verification Workflow
-                    ->render(function ($project) {
-                        return $project['verification'] === 'Verified' 
+                TD::make('verification_status', 'KeyWe Verification') 
+                    ->sort()
+                    ->render(function (Project $project) {
+                        return $project->verification_status === 'Verified' 
                             ? '<span class="badge bg-success">Verified</span>' 
-                            : '<span class="badge bg-secondary">Processing</span>';
+                            : '<span class="badge bg-secondary">' . $project->verification_status . '</span>';
                     }),
 
-                TD::make('units', 'Total Units')
+                TD::make('total_units', 'Total Units')
                     ->align(TD::ALIGN_RIGHT),
+
+                TD::make('views_count', 'Views')
+                    ->align(TD::ALIGN_RIGHT)
+                    ->render(fn(Project $project) => number_format($project->views_count)),
                 
-                // Action Buttons per row
                 TD::make('Actions')
                     ->align(TD::ALIGN_RIGHT)
-                    ->render(fn () => Button::make('Edit')
+                    ->render(fn (Project $project) => Button::make('Edit')
                         ->icon('pencil')
                         ->type(Color::LIGHT)),
             ]),
 
-            // 2. The Create Project Modal (Hidden by default, triggered by button)
+            // 2. Create Project Modal
             Layout::modal('createProjectModal', Layout::rows([
                 Input::make('project.name')
                     ->title('Project Name')
-                    ->placeholder('e.g. Green Valley Phase 1')
-                    ->help('Enter the official RERA registered name.'),
+                    ->required()
+                    ->placeholder('Green Valley Phase 1'),
 
                 Input::make('project.location')
                     ->title('Location')
+                    ->required()
                     ->placeholder('City, Area'),
 
-                Select::make('project.type')
+                Select::make('project.project_type')
                     ->title('Project Type')
                     ->options([
                         'residential' => 'Residential',
@@ -150,9 +120,14 @@ class BuilderProjectListScreen extends Screen
                         'mixed' => 'Mixed Use',
                     ]),
                 
-                Input::make('project.rera')
+                Input::make('project.rera_number')
                     ->title('RERA Number')
-                    ->placeholder('Enter RERA ID for verification'),
+                    ->placeholder('P518000XXXXX'),
+
+                // SRS FR-L-01: Builders input unit count
+                Input::make('project.total_units')
+                    ->title('Total Units')
+                    ->type('number'),
 
             ]))->title('Register New Project')
                ->applyButton('Create Project')
@@ -161,13 +136,25 @@ class BuilderProjectListScreen extends Screen
     }
 
     /**
-     * Logic to handle the "Create Project" form submission
+     * Create Project Logic (Saving to DB)
      */
     public function createProject(Request $request)
     {
-        // In a real app, you would validate and save to DB here.
-        // For now, we just show a toast notification.
-        
-        Toast::info('Project "' . $request->input('project.name') . '" created successfully. Verification pending.');
+        $data = $request->validate([
+            'project.name' => 'required|string',
+            'project.location' => 'required|string',
+            'project.project_type' => 'required',
+            'project.rera_number' => 'nullable|string',
+            'project.total_units' => 'numeric',
+        ])['project'];
+
+        // Assign to current user and set defaults
+        $data['user_id'] = Auth::id();
+        $data['status'] = 'Upcoming';
+        $data['verification_status'] = 'Draft';
+
+        Project::create($data);
+
+        Toast::info('Project "' . $data['name'] . '" created successfully.');
     }
 }

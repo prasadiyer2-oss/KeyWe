@@ -65,6 +65,11 @@ class PlatformProvider extends OrchidServiceProvider
             ->title('Super Admin Controls') // Separate section
             ->badge(fn () => 3, Color::DANGER),
 
+            Menu::make('Properties')
+            ->icon('bs.house-door')
+            ->route('platform.builder.properties')
+            ->title('Inventory'),
+
             // Menu::make('Sample Screen')
             //     ->icon('bs.collection')
             //     ->route('platform.example')
