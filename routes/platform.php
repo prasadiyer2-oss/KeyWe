@@ -25,6 +25,7 @@ use App\Orchid\Screens\BuilderProfileScreen;
 use App\Orchid\Screens\AdminBuilderVerificationScreen;
 use App\Orchid\Screens\BuilderPropertyListScreen;
 use Illuminate\Support\Facades\Route;
+use App\Orchid\Screens\AdminProjectVerificationScreen;
 use Tabuna\Breadcrumbs\Trail;
 
 /*
@@ -67,6 +68,12 @@ Route::screen('leads', BuilderLeadListScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.main')
         ->push(__('Lead Inbox'), route('platform.builder.leads')));
+
+Route::screen('admin/project-verification', AdminProjectVerificationScreen::class)
+    ->name('platform.admin.project.verification') // Unique name
+    ->breadcrumbs(fn ($trail) => $trail
+        ->parent('platform.main')
+        ->push('Project Verification', route('platform.admin.project.verification')));
 
 // Platform > Profile
 Route::screen('profile', UserProfileScreen::class)

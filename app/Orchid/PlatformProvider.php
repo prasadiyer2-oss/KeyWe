@@ -70,6 +70,11 @@ class PlatformProvider extends OrchidServiceProvider
             ->route('platform.builder.properties')
             ->title('Inventory'),
 
+            Menu::make('Project Verification')
+    ->icon('bs.building-check') // Changed icon to distinguish from User verification
+    ->route('platform.admin.project.verification')
+    ->title('Approvals'),
+
             // Menu::make('Sample Screen')
             //     ->icon('bs.collection')
             //     ->route('platform.example')
