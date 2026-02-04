@@ -8,12 +8,12 @@ use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
 use Orchid\Screen\Actions\ModalToggle;
-use Orchid\Screen\Actions\Button;
+use Orchid\Screen\Actions\Link; // <--- Changed from Button/ModalToggle
 use Orchid\Screen\Fields\Group;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Fields\Relation;
-use Orchid\Screen\Fields\Upload; // <--- IMPORT THIS
+use Orchid\Screen\Fields\Upload;
 use Orchid\Support\Color;
 use Orchid\Support\Facades\Toast;
 use Illuminate\Http\Request;
@@ -43,22 +43,10 @@ class BuilderPropertyListScreen extends Screen
         return 'Manage individual unit inventory, pricing, and availability.';
     }
 
-    /**
-     * FETCH DATA FOR EDITING
-     */
-    public function asyncGetProperty(Property $property): iterable
-    {
-        // Load attachments so they appear in the Upload field
-        $property->load('attachment'); 
-
-        return [
-            'property' => $property,
-        ];
-    }
-
     public function commandBar(): iterable
     {
         return [
+            // Keep Create as Modal for quick adding
             ModalToggle::make('Add Unit')
                 ->modal('createPropertyModal')
                 ->method('createProperty')
@@ -95,25 +83,13 @@ class BuilderPropertyListScreen extends Screen
 
                 TD::make('Actions')
                     ->align(TD::ALIGN_RIGHT)
-                    ->render(fn (Property $property) => Group::make([
-                        ModalToggle::make('Edit')
-                            ->modal('editPropertyModal')
-                            ->method('saveEditedProperty')
-                            ->async('asyncGetProperty')
-                            ->asyncParameters(['property' => $property->id])
-                            ->icon('pencil')
-                            ->type(Color::LIGHT),
-
-                        Button::make('Delete')
-                            ->method('deleteProperty')
-                            ->confirm('Are you sure you want to delete this unit?')
-                            ->parameters(['property' => $property->id])
-                            ->icon('trash')
-                            ->type(Color::DANGER),
-                    ])),
+                    ->render(fn (Property $property) => Link::make('Edit')
+                        ->route('platform.builder.properties.edit', $property->id) // Points to new page
+                        ->icon('pencil')
+                        ->type(Color::LIGHT)),
             ]),
 
-            // 2. CREATE MODAL
+            // 2. CREATE MODAL (Kept for quick add)
             Layout::modal('createPropertyModal', Layout::rows([
                 Relation::make('property.project_id')
                     ->title('Select Project')
@@ -132,49 +108,13 @@ class BuilderPropertyListScreen extends Screen
                 Input::make('property.area_sqft')->title('Area (sqft)')->type('number')->required(),
                 Input::make('property.price')->title('Price (₹)')->type('number')->required(),
 
-                // --- UPLOAD FIELD ---
-                Upload::make('property.attachment')
-                    ->title('Property Images')
-                    ->groups('photos') // Logic group name
-                    ->maxFiles(5)
-                    ->acceptedFiles('image/*'),
-
-            ]))->title('Add New Unit')->applyButton('Create'),
-
-            // 3. EDIT MODAL
-            Layout::modal('editPropertyModal', Layout::rows([
-                Input::make('property.id')->type('hidden'),
-
-                Relation::make('property.project_id')
-                    ->title('Project')
-                    ->fromModel(Project::class, 'name')
-                    ->applyScope('byBuilder')
-                    ->applyScope('verified')
-                    ->required(),
-
-                Input::make('property.title')->title('Unit Title')->required(),
-                
-                Select::make('property.configuration')
-                    ->title('Configuration')
-                    ->options(['1BHK'=>'1 BHK', '2BHK'=>'2 BHK', '3BHK'=>'3 BHK', '4BHK+'=>'4 BHK+', 'Villa'=>'Villa', 'Plot'=>'Plot'])
-                    ->required(),
-
-                Select::make('property.status')
-                    ->title('Status')
-                    ->options(['Available'=>'Available', 'Reserved'=>'Reserved', 'Sold'=>'Sold'])
-                    ->required(),
-
-                Input::make('property.area_sqft')->title('Area (sqft)')->type('number')->required(),
-                Input::make('property.price')->title('Price (₹)')->type('number')->required(),
-
-                // --- UPLOAD FIELD (Auto-fills because of query) ---
                 Upload::make('property.attachment')
                     ->title('Property Images')
                     ->groups('photos')
                     ->maxFiles(5)
                     ->acceptedFiles('image/*'),
 
-            ]))->title('Edit Unit Details')->applyButton('Save Changes'),
+            ]))->title('Add New Unit')->applyButton('Create'),
         ];
     }
 
@@ -189,64 +129,14 @@ class BuilderPropertyListScreen extends Screen
             'property.configuration' => 'required|string',
             'property.area_sqft' => 'required|numeric',
             'property.price' => 'required|numeric',
-            // Validate attachments (array of IDs)
             'property.attachment' => 'array', 
         ])['property'];
 
         $data['status'] = 'Available';
         $property = Property::create($data);
 
-        // SYNC IMAGES
-        // Orchid sends an array of Attachment IDs. This syncs them to the property.
         $property->attachment()->sync($request->input('property.attachment', []));
 
         Toast::info('Unit created successfully.');
-    }
-
-    /**
-     * LOGIC: Save Edited Property
-     */
-    public function saveEditedProperty(Request $request)
-    {
-        $data = $request->validate([
-            'property.id' => 'required|exists:properties,id',
-            'property.project_id' => 'required|exists:projects,id',
-            'property.title' => 'required|string',
-            'property.configuration' => 'required|string',
-            'property.status' => 'required|string',
-            'property.area_sqft' => 'required|numeric',
-            'property.price' => 'required|numeric',
-            'property.attachment' => 'array',
-        ])['property'];
-
-        $property = Property::findOrFail($data['id']);
-
-        if ($property->project->user_id !== Auth::id()) {
-            Toast::error('Unauthorized access.');
-            return;
-        }
-
-        $property->update($data);
-
-        // SYNC IMAGES (Handles adding new ones and removing deleted ones)
-        $property->attachment()->sync($request->input('property.attachment', []));
-
-        Toast::info('Unit updated successfully.');
-    }
-
-    public function deleteProperty(Request $request)
-    {
-        $property = Property::findOrFail($request->get('property'));
-
-        if ($property->project->user_id !== Auth::id()) {
-            Toast::error('Unauthorized access.');
-            return;
-        }
-
-        // Optional: Delete attachments when property is deleted
-        $property->attachment()->delete();
-        $property->delete();
-        
-        Toast::info('Unit deleted successfully.');
     }
 }

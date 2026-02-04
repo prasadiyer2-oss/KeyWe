@@ -26,6 +26,8 @@ use App\Orchid\Screens\AdminBuilderVerificationScreen;
 use App\Orchid\Screens\BuilderPropertyListScreen;
 use Illuminate\Support\Facades\Route;
 use App\Orchid\Screens\AdminProjectVerificationScreen;
+use App\Orchid\Screens\BuilderProjectEditScreen;
+use App\Orchid\Screens\BuilderPropertyEditScreen;
 use Tabuna\Breadcrumbs\Trail;
 
 /*
@@ -82,11 +84,24 @@ Route::screen('profile', UserProfileScreen::class)
         ->parent('platform.index')
         ->push(__('Profile'), route('platform.profile')));
         
+Route::screen('builder/properties/{property}/edit', BuilderPropertyEditScreen::class)
+    ->name('platform.builder.properties.edit')
+    ->breadcrumbs(fn ($trail) => $trail
+        ->parent('platform.index') // or your main dashboard
+        ->push('Properties', route('platform.builder.properties')) // Update with your actual list route name
+        ->push('Edit Unit'));
+        
 Route::screen('admin/verification', AdminBuilderVerificationScreen::class)
     ->name('platform.admin.verification')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.main')
         ->push(__('Builder Verification'), route('platform.admin.verification')));
+        Route::screen('builder/projects/{project}/edit', BuilderProjectEditScreen::class)
+    ->name('platform.builder.projects.edit')
+    ->breadcrumbs(fn ($trail) => $trail
+        ->parent('platform.index') // or your main dashboard
+        ->push('My Projects', route('platform.builder.projects')) // Adjust if your list route is named differently
+        ->push('Edit Project'));
         
 Route::screen('properties', BuilderPropertyListScreen::class)
     ->name('platform.builder.properties')

@@ -14,6 +14,7 @@ use Orchid\Screen\Fields\Select;
 use Orchid\Support\Color;
 use Orchid\Support\Facades\Toast;
 use Illuminate\Support\Facades\Auth;
+use Orchid\Screen\Actions\Link;
 
 class BuilderProjectListScreen extends Screen
 {
@@ -94,10 +95,11 @@ class BuilderProjectListScreen extends Screen
                     ->render(fn(Project $project) => number_format($project->views_count)),
                 
                 TD::make('Actions')
-                    ->align(TD::ALIGN_RIGHT)
-                    ->render(fn (Project $project) => Button::make('Edit')
-                        ->icon('pencil')
-                        ->type(Color::LIGHT)),
+    ->align(TD::ALIGN_RIGHT)
+    ->render(fn (Project $project) => Link::make('Edit')
+        ->route('platform.builder.projects.edit', $project->id) // Points to the new page
+        ->icon('pencil')
+        ->type(Color::LIGHT)),
             ]),
 
             // 2. Create Project Modal
