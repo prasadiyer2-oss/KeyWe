@@ -9,6 +9,7 @@ use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Actions\Button;
+use Orchid\Screen\Fields\Group;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Fields\Relation;
@@ -19,79 +20,55 @@ use Illuminate\Support\Facades\Auth;
 
 class BuilderPropertyListScreen extends Screen
 {
-    /**
-     * Fetch data to be displayed on the screen.
-     */
     public function query(): iterable
     {
-        // Fetch properties ONLY for projects owned by the logged-in builder
         return [
             'properties' => Property::whereHas('project', function ($query) {
                 $query->where('user_id', Auth::id());
             })
-            ->with('project') // Eager load for performance
+            ->with('project')
             ->latest()
             ->paginate(10)
         ];
     }
 
-    /**
-     * The name of the screen displayed in the header.
-     */
     public function name(): ?string
     {
         return 'Properties (Units)';
     }
 
-    /**
-     * The description is displayed on the user's screen under the heading
-     */
     public function description(): ?string
     {
         return 'Manage individual unit inventory, pricing, and availability.';
     }
 
     /**
-     * Fetch property data for modal prefill
+     * FETCH DATA FOR EDITING
+     * This runs automatically when you click the "Edit" pencil icon.
      */
-    public function asyncGetProperty($property): iterable
-    {
-        $propertyModel = Property::findOrFail($property);
-        return ['property' => $propertyModel];
-    }
-
-    /**
-     * Get project options for dropdown
-     */
-    public function getProjectOptions(): array
-    {
-        return Project::where('user_id', Auth::id())
-            ->where('verification_status', 'Verified')
-            ->pluck('name', 'id')
-            ->toArray();
-    }
-
-    /**
-     * Button commands.
-     */
-    public function commandBar(): iterable
+    public function asyncGetProperty(Property $property): iterable
     {
         return [
-            ModalToggle::make('Add Unit')
-                ->modal('createPropertyModal')
-                ->method('updateProperty')
-                ->icon('plus')
-                ->type(Color::SUCCESS), // KeyWe Green for Primary Action
+            'property' => $property,
         ];
     }
 
-    /**
-     * Views.
-     */
+    public function commandBar(): iterable
+    {
+        return [
+            // ADD UNIT BUTTON (Untouched, uses 'createProperty')
+            ModalToggle::make('Add Unit')
+                ->modal('createPropertyModal')
+                ->method('createProperty')
+                ->icon('plus')
+                ->type(Color::SUCCESS),
+        ];
+    }
+
     public function layout(): iterable
     {
         return [
-            // 1. Properties Table
+            // 1. TABLE
             Layout::table('properties', [
                 TD::make('title', 'Unit Title')
                     ->sort()
@@ -100,147 +77,168 @@ class BuilderPropertyListScreen extends Screen
                 TD::make('project.name', 'Project')
                     ->render(fn (Property $property) => $property->project->name ?? '-'),
 
-                TD::make('configuration', 'Config')
-                    ->sort(),
+                TD::make('configuration', 'Config')->sort(),
 
                 TD::make('price', 'Price')
                     ->sort()
                     ->render(fn (Property $property) => '₹ ' . number_format($property->price)),
 
                 TD::make('status', 'Status')
-                    ->render(function (Property $property) {
-                        $color = match ($property->status) {
-                            'Available' => 'text-success',
-                            'Reserved' => 'text-warning',
-                            'Sold' => 'text-danger',
-                            default => 'text-muted',
-                        };
-                        return "<span class='{$color}'>● {$property->status}</span>";
+                    ->render(fn (Property $property) => match ($property->status) {
+                        'Available' => "<span class='text-success'>● {$property->status}</span>",
+                        'Reserved' => "<span class='text-warning'>● {$property->status}</span>",
+                        'Sold' => "<span class='text-danger'>● {$property->status}</span>",
+                        default => "<span class='text-muted'>● {$property->status}</span>",
                     }),
 
+                // ACTIONS COLUMN (Fixed: Using Group::make)
                 TD::make('Actions')
                     ->align(TD::ALIGN_RIGHT)
-                    ->render(function (Property $property) {
-                        return ModalToggle::make('Edit')
-                            ->icon('pencil')
-                            ->type(Color::LIGHT)
-                            ->modal('createPropertyModal')
-                            ->method('updateProperty')
-                            ->async('asyncGetProperty')
+                    ->render(fn (Property $property) => Group::make([
+                        
+                        // EDIT BUTTON
+                        ModalToggle::make('Edit')
+                            ->modal('editPropertyModal') // Uses the NEW separate modal
+                            ->method('saveEditedProperty') // Uses the NEW separate method
+                            ->async('asyncGetProperty') // Fetches DB data
                             ->asyncParameters(['property' => $property->id])
-                            . ' ' .
-                            Button::make('Delete')
-                                ->icon('trash')
-                                ->type(Color::DANGER)
-                                ->method('deleteProperty')
-                                ->parameters(['property' => $property->id])
-                                ->confirm('Are you sure you want to delete this property?');
-                    }),
+                            ->icon('pencil')
+                            ->type(Color::LIGHT),
+
+                        // DELETE BUTTON
+                        Button::make('Delete')
+                            ->method('deleteProperty')
+                            ->confirm('Are you sure you want to delete this unit?')
+                            ->parameters(['property' => $property->id])
+                            ->icon('trash')
+                            ->type(Color::DANGER),
+                    ])),
             ]),
 
-            // 2. Create/Edit Property Modal
+            // 2. CREATE MODAL (Used ONLY by "Add Unit" button)
             Layout::modal('createPropertyModal', Layout::rows([
-                Input::make('property.id')
-                    ->type('hidden')
-                    ->value(null),
-
-                Select::make('property.project_id')
+                Relation::make('property.project_id')
                     ->title('Select Project')
-                    ->options($this->getProjectOptions())
-                    ->required()
-                    ->help('Link this unit to one of your verified projects.'),
+                    ->fromModel(Project::class, 'name')
+                    ->applyScope('byBuilder')
+                    ->applyScope('verified')
+                    ->required(),
 
                 Input::make('property.title')
-                    ->title('Unit Title/Number')
-                    ->placeholder('e.g. A-101 or Villa 4')
+                    ->title('Unit Title')
+                    ->placeholder('e.g. A-101')
                     ->required(),
 
                 Select::make('property.configuration')
                     ->title('Configuration')
                     ->options([
-                        '1BHK' => '1 BHK',
-                        '2BHK' => '2 BHK',
-                        '3BHK' => '3 BHK',
-                        '4BHK+' => '4 BHK+',
-                        'Villa' => 'Villa',
-                        'Plot' => 'Plot',
+                        '1BHK' => '1 BHK', '2BHK' => '2 BHK', '3BHK' => '3 BHK',
+                        '4BHK+' => '4 BHK+', 'Villa' => 'Villa', 'Plot' => 'Plot',
                     ])
                     ->required(),
 
-                Input::make('property.area_sqft')
-                    ->title('Area (sqft)')
-                    ->type('number')
+                Input::make('property.area_sqft')->title('Area (sqft)')->type('number')->required(),
+                Input::make('property.price')->title('Price (₹)')->type('number')->required(),
+
+            ]))->title('Add New Unit')->applyButton('Create'),
+
+            // 3. EDIT MODAL (New separate modal for Editing)
+            Layout::modal('editPropertyModal', Layout::rows([
+                // Hidden ID field ensures we update the existing record
+                Input::make('property.id')->type('hidden'),
+
+                Relation::make('property.project_id')
+                    ->title('Project')
+                    ->fromModel(Project::class, 'name')
+                    ->applyScope('byBuilder')
+                    ->applyScope('verified')
                     ->required(),
 
-                Input::make('property.price')
-                    ->title('Price (₹)')
-                    ->type('number')
+                Input::make('property.title')->title('Unit Title')->required(),
+
+                Select::make('property.configuration')
+                    ->title('Configuration')
+                    ->options([
+                        '1BHK' => '1 BHK', '2BHK' => '2 BHK', '3BHK' => '3 BHK',
+                        '4BHK+' => '4 BHK+', 'Villa' => 'Villa', 'Plot' => 'Plot',
+                    ])
                     ->required(),
 
+                // Status field is only available in Edit mode
                 Select::make('property.status')
                     ->title('Status')
                     ->options([
                         'Available' => 'Available',
-                        'Reserved' => 'Reserved',
-                        'Sold' => 'Sold',
-                    ]),
+                        'Reserved'  => 'Reserved',
+                        'Sold'      => 'Sold',
+                    ])
+                    ->required(),
 
-            ]))->title('Add New Unit')
-               ->applyButton('Save Unit')
-               ->closeButton('Cancel'),
+                Input::make('property.area_sqft')->title('Area (sqft)')->type('number')->required(),
+                Input::make('property.price')->title('Price (₹)')->type('number')->required(),
+
+            ]))->title('Edit Unit Details')->applyButton('Save Changes'),
         ];
     }
 
     /**
-     * Logic to create or update a property
+     * LOGIC: Create New Property (Untouched)
      */
-    public function updateProperty(Request $request)
+    public function createProperty(Request $request)
     {
         $data = $request->validate([
-            'property.id' => 'nullable|exists:properties,id',
             'property.project_id' => 'required|exists:projects,id',
             'property.title' => 'required|string',
             'property.configuration' => 'required|string',
             'property.area_sqft' => 'required|numeric',
             'property.price' => 'required|numeric',
-            'property.status' => 'nullable|in:Available,Reserved,Sold',
         ])['property'];
 
-        // If ID is provided, update; otherwise create new
-        if (!empty($data['id'])) {
-            $property = Property::findOrFail($data['id']);
-
-            // Security check: Ensure builder owns the project
-            if ($property->project->user_id !== Auth::id()) {
-                Toast::error('Unauthorized access.');
-                return;
-            }
-
-            unset($data['id']);
-            $property->update($data);
-            Toast::info('Unit updated successfully.');
-        } else {
-            // Creating new property
-            unset($data['id']);
-            $data['status'] = 'Available';
-            Property::create($data);
-            Toast::info('Unit created successfully.');
-        }
+        $data['status'] = 'Available';
+        Property::create($data);
+        Toast::info('Unit created successfully.');
     }
 
     /**
-     * Logic to delete a property
+     * LOGIC: Save Edited Property (New & Separate)
      */
-    public function deleteProperty(Property $property)
+    public function saveEditedProperty(Request $request)
     {
-        // Verify that the property belongs to the logged-in builder
+        $data = $request->validate([
+            'property.id' => 'required|exists:properties,id', // Must exist
+            'property.project_id' => 'required|exists:projects,id',
+            'property.title' => 'required|string',
+            'property.configuration' => 'required|string',
+            'property.status' => 'required|string',
+            'property.area_sqft' => 'required|numeric',
+            'property.price' => 'required|numeric',
+        ])['property'];
+
+        $property = Property::findOrFail($data['id']);
+
+        // Security check
         if ($property->project->user_id !== Auth::id()) {
-            Toast::error('You do not have permission to delete this property.');
+            Toast::error('Unauthorized access.');
+            return;
+        }
+
+        $property->update($data);
+        Toast::info('Unit updated successfully.');
+    }
+
+    /**
+     * LOGIC: Delete Property
+     */
+    public function deleteProperty(Request $request)
+    {
+        $property = Property::findOrFail($request->get('property'));
+
+        if ($property->project->user_id !== Auth::id()) {
+            Toast::error('Unauthorized access.');
             return;
         }
 
         $property->delete();
-
         Toast::info('Unit deleted successfully.');
     }
 }
