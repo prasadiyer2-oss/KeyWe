@@ -1,0 +1,52 @@
+:root {
+  --color-keywe-light: #84cc76;
+  --color-keywe-dark: #6fb96f;
+  --color-keywe-primary: #6fb96f;
+  --color-keywe-heading: #1f3d3a;
+  --color-keywe-bg-green: #eef6ee;
+  --color-keywe-bg: #fcfcfc;
+  --color-keywe-pale: #e9f5e9;
+  --color-keywe-primary-text: #2b2b2b;
+  --color-keywe-secondary-text: #6e6e6e;
+  --color-keywe-border: #e6e6e6;
+
+  /* Override Bootstrap variables */
+  --bs-primary: var(--color-keywe-primary);
+  --bs-primary-rgb: 111, 185, 111; /* approx rgb of #6fb96f */
+  --bs-secondary: var(--color-keywe-secondary-text);
+  --bs-light: var(--color-keywe-bg);
+  --bs-dark: var(--color-keywe-heading);
+  --bs-body-color: var(--color-keywe-primary-text);
+  --bs-body-bg: var(--color-keywe-bg);
+  --bs-border-color: var(--color-keywe-border);
+}
+
+/* Customize Orchid sidebar */
+.aside.bg-dark {
+  background-color: var(--color-keywe-bg-green) !important;
+  --bs-body-color: var(--color-keywe-primary-text) !important;
+  color: var(--color-keywe-primary-text) !important;
+}
+
+.aside .nav-link {
+  color: var(--color-keywe-primary-text) !important;
+}
+
+.aside .nav-link:hover {
+  background-color: var(--color-keywe-pale) !important;
+  color: var(--color-keywe-primary-text) !important;
+}
+
+.aside .bg-dark {
+  background-color: var(--color-keywe-bg-green) !important;
+  --bs-body-color: var(--color-keywe-primary-text) !important;
+  color: var(--color-keywe-primary-text) !important;
+}
+
+.aside footer * {
+  color: var(--color-keywe-primary-text) !important;
+}
+
+.aside .text-muted {
+  color: var(--color-keywe-primary-text) !important;
+}
