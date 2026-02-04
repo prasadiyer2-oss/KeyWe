@@ -149,6 +149,7 @@ class BuilderPropertyListScreen extends Screen
                     ->title('Project')
                     ->fromModel(Project::class, 'name')
                     ->applyScope('byBuilder')
+                    ->applyScope('verified')
                     ->required(),
 
                 Input::make('property.title')->title('Unit Title')->required(),
