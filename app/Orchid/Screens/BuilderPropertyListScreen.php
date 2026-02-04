@@ -20,9 +20,9 @@ use Illuminate\Support\Facades\Auth;
 
 class BuilderPropertyListScreen extends Screen
 {
-    public function query(): iterable
+    public function query(Property $property = null): iterable
     {
-        return [
+        $data = [
             'properties' => Property::whereHas('project', function ($query) {
                 $query->where('user_id', Auth::id());
             })
@@ -30,6 +30,13 @@ class BuilderPropertyListScreen extends Screen
             ->latest()
             ->paginate(10)
         ];
+        
+        // If a property is being edited, include it in the query data
+        if ($property) {
+            $data['property'] = $property;
+        }
+        
+        return $data;
     }
 
     public function name(): ?string
@@ -46,10 +53,11 @@ class BuilderPropertyListScreen extends Screen
      * FETCH DATA FOR EDITING
      * This runs automatically when you click the "Edit" pencil icon.
      */
-    public function asyncGetProperty(Property $property): iterable
+    public function asyncGetProperty($property): iterable
     {
+        $prop = Property::findOrFail($property);
         return [
-            'property' => $property,
+            'property' => $prop,
         ];
     }
 
@@ -202,10 +210,15 @@ class BuilderPropertyListScreen extends Screen
     /**
      * LOGIC: Save Edited Property (New & Separate)
      */
-    public function saveEditedProperty(Request $request)
+    public function saveEditedProperty(Request $request, Property $property)
     {
+        // Security check first
+        if ($property->project->user_id !== Auth::id()) {
+            Toast::error('Unauthorized access.');
+            return;
+        }
+
         $data = $request->validate([
-            'property.id' => 'required|exists:properties,id', // Must exist
             'property.project_id' => 'required|exists:projects,id',
             'property.title' => 'required|string',
             'property.configuration' => 'required|string',
@@ -213,14 +226,6 @@ class BuilderPropertyListScreen extends Screen
             'property.area_sqft' => 'required|numeric',
             'property.price' => 'required|numeric',
         ])['property'];
-
-        $property = Property::findOrFail($data['id']);
-
-        // Security check
-        if ($property->project->user_id !== Auth::id()) {
-            Toast::error('Unauthorized access.');
-            return;
-        }
 
         $property->update($data);
         Toast::info('Unit updated successfully.');
