@@ -52,6 +52,26 @@ class BuilderPropertyListScreen extends Screen
     }
 
     /**
+     * Fetch property data for modal prefill
+     */
+    public function asyncGetProperty($property): iterable
+    {
+        $propertyModel = Property::findOrFail($property);
+        return ['property' => $propertyModel];
+    }
+
+    /**
+     * Get project options for dropdown
+     */
+    public function getProjectOptions(): array
+    {
+        return Project::where('user_id', Auth::id())
+            ->where('verification_status', 'Verified')
+            ->pluck('name', 'id')
+            ->toArray();
+    }
+
+    /**
      * Button commands.
      */
     public function commandBar(): iterable
@@ -59,7 +79,7 @@ class BuilderPropertyListScreen extends Screen
         return [
             ModalToggle::make('Add Unit')
                 ->modal('createPropertyModal')
-                ->method('createProperty')
+                ->method('updateProperty')
                 ->icon('plus')
                 ->type(Color::SUCCESS), // KeyWe Green for Primary Action
         ];
@@ -100,21 +120,35 @@ class BuilderPropertyListScreen extends Screen
 
                 TD::make('Actions')
                     ->align(TD::ALIGN_RIGHT)
-                    ->render(fn () => Button::make('Edit')
-                        ->icon('pencil')
-                        ->type(Color::LIGHT)),
+                    ->render(function (Property $property) {
+                        return ModalToggle::make('Edit')
+                            ->icon('pencil')
+                            ->type(Color::LIGHT)
+                            ->modal('createPropertyModal')
+                            ->method('updateProperty')
+                            ->async('asyncGetProperty')
+                            ->asyncParameters(['property' => $property->id])
+                            . ' ' .
+                            Button::make('Delete')
+                                ->icon('trash')
+                                ->type(Color::DANGER)
+                                ->method('deleteProperty')
+                                ->parameters(['property' => $property->id])
+                                ->confirm('Are you sure you want to delete this property?');
+                    }),
             ]),
 
-            // 2. Create Property Modal
+            // 2. Create/Edit Property Modal
             Layout::modal('createPropertyModal', Layout::rows([
-                // Relation Field: Only shows projects owned by the current user
-                Relation::make('property.project_id')
-                ->title('Select Project')
-                ->fromModel(Project::class, 'name')
-                ->applyScope('byBuilder')
-                ->applyScope('verified')
-                ->required()
-                ->help('Link this unit to one of your verified projects.'),
+                Input::make('property.id')
+                    ->type('hidden')
+                    ->value(null),
+
+                Select::make('property.project_id')
+                    ->title('Select Project')
+                    ->options($this->getProjectOptions())
+                    ->required()
+                    ->help('Link this unit to one of your verified projects.'),
 
                 Input::make('property.title')
                     ->title('Unit Title/Number')
@@ -143,6 +177,14 @@ class BuilderPropertyListScreen extends Screen
                     ->type('number')
                     ->required(),
 
+                Select::make('property.status')
+                    ->title('Status')
+                    ->options([
+                        'Available' => 'Available',
+                        'Reserved' => 'Reserved',
+                        'Sold' => 'Sold',
+                    ]),
+
             ]))->title('Add New Unit')
                ->applyButton('Save Unit')
                ->closeButton('Cancel'),
@@ -150,22 +192,55 @@ class BuilderPropertyListScreen extends Screen
     }
 
     /**
-     * Logic to create a new property
+     * Logic to create or update a property
      */
-    public function createProperty(Request $request)
+    public function updateProperty(Request $request)
     {
         $data = $request->validate([
+            'property.id' => 'nullable|exists:properties,id',
             'property.project_id' => 'required|exists:projects,id',
             'property.title' => 'required|string',
             'property.configuration' => 'required|string',
             'property.area_sqft' => 'required|numeric',
             'property.price' => 'required|numeric',
+            'property.status' => 'nullable|in:Available,Reserved,Sold',
         ])['property'];
 
-        $data['status'] = 'Available';
+        // If ID is provided, update; otherwise create new
+        if (!empty($data['id'])) {
+            $property = Property::findOrFail($data['id']);
 
-        Property::create($data);
+            // Security check: Ensure builder owns the project
+            if ($property->project->user_id !== Auth::id()) {
+                Toast::error('Unauthorized access.');
+                return;
+            }
 
-        Toast::info('Unit created successfully.');
+            unset($data['id']);
+            $property->update($data);
+            Toast::info('Unit updated successfully.');
+        } else {
+            // Creating new property
+            unset($data['id']);
+            $data['status'] = 'Available';
+            Property::create($data);
+            Toast::info('Unit created successfully.');
+        }
+    }
+
+    /**
+     * Logic to delete a property
+     */
+    public function deleteProperty(Property $property)
+    {
+        // Verify that the property belongs to the logged-in builder
+        if ($property->project->user_id !== Auth::id()) {
+            Toast::error('You do not have permission to delete this property.');
+            return;
+        }
+
+        $property->delete();
+
+        Toast::info('Unit deleted successfully.');
     }
 }
