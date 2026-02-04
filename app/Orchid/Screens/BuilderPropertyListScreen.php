@@ -111,9 +111,10 @@ class BuilderPropertyListScreen extends Screen
                 Relation::make('property.project_id')
                 ->title('Select Project')
                 ->fromModel(Project::class, 'name')
-                ->applyScope('byBuilder') // <--- FIXED: Pass the scope name as a string
+                ->applyScope('byBuilder')
+                ->applyScope('verified')
                 ->required()
-                ->help('Link this unit to one of your existing projects.'),
+                ->help('Link this unit to one of your verified projects.'),
 
                 Input::make('property.title')
                     ->title('Unit Title/Number')

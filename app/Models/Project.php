@@ -35,5 +35,9 @@ class Project extends Model
     {
         return $query->where('user_id', Auth::id());
     }
-    
+
+    public function scopeVerified($query)
+    {
+        return $query->where('verification_status', 'Verified');
+    }
 }
