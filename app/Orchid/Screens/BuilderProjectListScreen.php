@@ -2,45 +2,40 @@
 
 namespace App\Orchid\Screens;
 
-use App\Models\Project; // <--- Import Model
+use App\Models\Project;
 use Illuminate\Http\Request;
 use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
 use Orchid\Screen\Actions\ModalToggle;
-use Orchid\Screen\Actions\Button;
+use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Select;
+use Orchid\Screen\Fields\Upload; // <--- Ensure this is imported
 use Orchid\Support\Color;
 use Orchid\Support\Facades\Toast;
 use Illuminate\Support\Facades\Auth;
-use Orchid\Screen\Actions\Link;
 
 class BuilderProjectListScreen extends Screen
 {
-    /**
-     * Fetch data to be displayed on the screen.
-     */
+    // ... (query, permission, name, description, commandBar methods remain the same) ...
+
     public function query(): iterable
     {
-        // Fetch projects for the currently logged-in builder
         return [
             'projects' => Project::where('user_id', Auth::id())
                 ->latest()
-                ->paginate(10) // Standard pagination
+                ->paginate(10)
         ];
     }
 
     public function permission(): ?iterable
-{
-    return [
-        'platform.builder.projects',
-    ];
-}
+    {
+        return [
+            'platform.builder.projects',
+        ];
+    }
 
-    /**
-     * The name of the screen displayed in the header.
-     */
     public function name(): ?string
     {
         return 'My Projects';
@@ -65,51 +60,40 @@ class BuilderProjectListScreen extends Screen
     public function layout(): iterable
     {
         return [
-            // 1. Project List Table (From DB)
+            // 1. Project List Table
             Layout::table('projects', [
                 TD::make('name', 'Project Name')
                     ->sort()
                     ->render(fn (Project $project) => "<strong>{$project->name}</strong>"),
                 
-                TD::make('location', 'Location')
-                    ->sort(),
+                TD::make('location', 'Location')->sort(),
 
                 TD::make('status', 'Status')
                     ->sort()
-                    ->render(function (Project $project) {
-                        $color = match ($project->status) {
-                            'Ongoing' => 'text-primary',
-                            'Completed' => 'text-success',
-                            'Upcoming' => 'text-warning',
-                            default => 'text-muted',
-                        };
-                        return "<span class='{$color}'>● {$project->status}</span>";
+                    ->render(fn (Project $project) => match ($project->status) {
+                        'Ongoing' => "<span class='text-primary'>● {$project->status}</span>",
+                        'Completed' => "<span class='text-success'>● {$project->status}</span>",
+                        'Upcoming' => "<span class='text-warning'>● {$project->status}</span>",
+                        default => "<span class='text-muted'>● {$project->status}</span>",
                     }),
 
                 TD::make('verification_status', 'KeyWe Verification') 
                     ->sort()
-                    ->render(function (Project $project) {
-                        return $project->verification_status === 'Verified' 
-                            ? '<span class="badge bg-success">Verified</span>' 
-                            : '<span class="badge bg-secondary">' . $project->verification_status . '</span>';
-                    }),
+                    ->render(fn (Project $project) => $project->verification_status === 'Verified' 
+                        ? '<span class="badge bg-success">Verified</span>' 
+                        : '<span class="badge bg-secondary">' . $project->verification_status . '</span>'),
 
-                TD::make('total_units', 'Total Units')
-                    ->align(TD::ALIGN_RIGHT),
+                TD::make('total_units', 'Total Units')->align(TD::ALIGN_RIGHT),
 
-                TD::make('views_count', 'Views')
-                    ->align(TD::ALIGN_RIGHT)
-                    ->render(fn(Project $project) => number_format($project->views_count)),
-                
                 TD::make('Actions')
-    ->align(TD::ALIGN_RIGHT)
-    ->render(fn (Project $project) => Link::make('Edit')
-        ->route('platform.builder.projects.edit', $project->id) // Points to the new page
-        ->icon('pencil')
-        ->type(Color::LIGHT)),
+                    ->align(TD::ALIGN_RIGHT)
+                    ->render(fn (Project $project) => Link::make('Edit')
+                        ->route('platform.builder.projects.edit', $project->id)
+                        ->icon('pencil')
+                        ->type(Color::LIGHT)),
             ]),
 
-            // 2. Create Project Modal
+            // 2. Create Project Modal (UPDATED WITH UPLOAD)
             Layout::modal('createProjectModal', Layout::rows([
                 Input::make('project.name')
                     ->title('Project Name')
@@ -133,10 +117,16 @@ class BuilderProjectListScreen extends Screen
                     ->title('RERA Number')
                     ->placeholder('P518000XXXXX'),
 
-                // SRS FR-L-01: Builders input unit count
                 Input::make('project.total_units')
                     ->title('Total Units')
                     ->type('number'),
+
+                // --- NEW IMAGE UPLOAD FIELD ---
+                Upload::make('project.attachment')
+                    ->title('Project Images')
+                    ->groups('project_images') // Distinct group name
+                    ->maxFiles(5)
+                    ->acceptedFiles('image/*'),
 
             ]))->title('Register New Project')
                ->applyButton('Create Project')
@@ -145,7 +135,7 @@ class BuilderProjectListScreen extends Screen
     }
 
     /**
-     * Create Project Logic (Saving to DB)
+     * Create Project Logic (UPDATED TO SYNC IMAGES)
      */
     public function createProject(Request $request)
     {
@@ -155,14 +145,18 @@ class BuilderProjectListScreen extends Screen
             'project.project_type' => 'required',
             'project.rera_number' => 'nullable|string',
             'project.total_units' => 'numeric',
+            // Validate attachment
+            'project.attachment' => 'array', 
         ])['project'];
 
-        // Assign to current user and set defaults
         $data['user_id'] = Auth::id();
         $data['status'] = 'Upcoming';
         $data['verification_status'] = 'Draft';
 
-        Project::create($data);
+        $project = Project::create($data);
+
+        // SYNC IMAGES TO THE NEW PROJECT
+        $project->attachment()->sync($request->input('project.attachment', []));
 
         Toast::info('Project "' . $data['name'] . '" created successfully.');
     }

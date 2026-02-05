@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Orchid\Screen\Screen;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Select;
+use Orchid\Screen\Fields\Upload; // <--- 1. Import Upload
 use Orchid\Support\Facades\Layout;
 use Orchid\Screen\Actions\Button;
 use Orchid\Support\Color;
@@ -22,7 +23,6 @@ class BuilderProjectEditScreen extends Screen
 
     /**
      * Fetch data to be displayed on the screen.
-     * Orchid automatically finds the project from the URL ID.
      */
     public function query(Project $project): iterable
     {
@@ -30,6 +30,9 @@ class BuilderProjectEditScreen extends Screen
         if ($project->user_id !== Auth::id()) {
             abort(403, 'You are not authorized to edit this project.');
         }
+
+        // 2. Load existing images so they appear in the edit list
+        $project->load('attachment');
 
         return [
             'project' => $project
@@ -98,6 +101,15 @@ class BuilderProjectEditScreen extends Screen
                 Input::make('project.total_units')
                     ->title('Total Units')
                     ->type('number'),
+
+                // 3. Add the Upload Field
+                // Orchid automatically handles "View Existing" and "Remove" UI here
+                Upload::make('project.attachment')
+                    ->title('Project Images')
+                    ->groups('project_images') // Must match group name used in Create
+                    ->maxFiles(10)
+                    ->acceptedFiles('image/*')
+                    ->help('Upload new images or remove existing ones.'),
             ])
         ];
     }
@@ -119,9 +131,15 @@ class BuilderProjectEditScreen extends Screen
             'project.status' => 'required',
             'project.rera_number' => 'nullable|string',
             'project.total_units' => 'numeric',
+            // Validate the attachment array
+            'project.attachment' => 'array', 
         ])['project'];
 
         $project->fill($data)->save();
+
+        // 4. Sync the attachments
+        // This adds new uploads and removes ones deleted in the UI
+        $project->attachment()->sync($request->input('project.attachment', []));
 
         Toast::info('Project updated successfully.');
 
@@ -138,6 +156,8 @@ class BuilderProjectEditScreen extends Screen
             abort(403);
         }
 
+        // Optional: clean up files
+        $project->attachment()->delete();
         $project->delete();
 
         Toast::info('Project deleted successfully.');

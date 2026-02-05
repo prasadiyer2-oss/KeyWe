@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Orchid\Screen\AsSource; // Required for Orchid
+use Orchid\Screen\AsSource;
+use Orchid\Attachment\Attachable; // Required for Orchid
 
 class Project extends Model
 {
-    use HasFactory, AsSource;
+    use HasFactory, AsSource, Attachable;
 
     protected $fillable = [
         'name', 'location', 'rera_number', 'project_type', 
