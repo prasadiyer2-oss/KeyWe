@@ -126,4 +126,11 @@ class AdminProjectVerificationScreen extends Screen
 
         Toast::warning("Project '{$project->name}' has been rejected.");
     }
+
+    public function permission(): ?iterable
+    {
+        return [
+            'platform.admin.project.verification',
+        ];
+    }
 }

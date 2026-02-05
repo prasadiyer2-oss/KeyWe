@@ -31,6 +31,13 @@ class BuilderProjectListScreen extends Screen
         ];
     }
 
+    public function permission(): ?iterable
+{
+    return [
+        'platform.builder.projects',
+    ];
+}
+
     /**
      * The name of the screen displayed in the header.
      */

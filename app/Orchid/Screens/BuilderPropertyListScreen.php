@@ -33,6 +33,13 @@ class BuilderPropertyListScreen extends Screen
         ];
     }
 
+    public function permission(): ?iterable
+    {
+        return [
+            'platform.builder.properties',
+        ];
+    }
+
     public function name(): ?string
     {
         return 'Properties (Units)';

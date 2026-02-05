@@ -43,7 +43,8 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make('My Projects')
             ->icon('bs.building') // Building icon fits the Builder role
             ->route('platform.builder.projects')
-            ->title('Property Management'),
+            ->title('Property Management')
+            ->permission('platform.builder.projects'),
 
             Menu::make('Lead Inbox')
             ->icon('bs.envelope-paper') // Icon representing incoming leads
@@ -68,10 +69,11 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make('Properties')
             ->icon('bs.house-door')
             ->route('platform.builder.properties')
-            ->title('Inventory'),
+            ->title('Inventory')
+            ->permission('platform.builder.properties'),
 
             Menu::make('Project Verification')
-    ->icon('bs.building-check') // Changed icon to distinguish from User verification
+            ->icon('bs.building-check') // Changed icon to distinguish from User verification
     ->route('platform.admin.project.verification')
     ->title('Approvals'),
 
@@ -139,6 +141,13 @@ class PlatformProvider extends OrchidServiceProvider
             ItemPermission::group(__('System'))
                 ->addPermission('platform.systems.roles', __('Roles'))
                 ->addPermission('platform.systems.users', __('Users')),
+            ItemPermission::group(__('Builder Controls'))
+                ->addPermission('platform.builder.projects', __('Manage Projects (Create/Edit)'))
+                ->addPermission('platform.builder.properties', __('Manage Units/Properties')),
+            ItemPermission::group(__('Admin Verification'))
+                ->addPermission('platform.admin.project.verification', __('Verify Projects'))
+                ->addPermission('platform.admin.builder.verification', __('Verify Builders')),
+            
         ];
     }
 }
