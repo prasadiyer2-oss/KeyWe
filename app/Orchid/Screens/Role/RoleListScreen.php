@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace App\Orchid\Screens\Role;
 
-use App\Orchid\Layouts\Role\RoleListLayout;
 use Orchid\Platform\Models\Role;
 use Orchid\Screen\Action;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Screen;
+use Orchid\Screen\TD; // Import TD
+use Orchid\Support\Facades\Layout; // Import Layout facade
 
 class RoleListScreen extends Screen
 {
     /**
      * Fetch data to be displayed on the screen.
-     *
-     * @return array
      */
     public function query(): iterable
     {
@@ -37,7 +36,7 @@ class RoleListScreen extends Screen
      */
     public function description(): ?string
     {
-        return 'A comprehensive list of all roles, including their permissions and associated users.';
+        return 'A comprehensive list of all roles, including their permissions.';
     }
 
     public function permission(): ?iterable
@@ -49,8 +48,6 @@ class RoleListScreen extends Screen
 
     /**
      * The screen's action buttons.
-     *
-     * @return Action[]
      */
     public function commandBar(): iterable
     {
@@ -63,13 +60,38 @@ class RoleListScreen extends Screen
 
     /**
      * The screen's layout elements.
-     *
-     * @return string[]|\Orchid\Screen\Layout[]
      */
     public function layout(): iterable
     {
         return [
-            RoleListLayout::class,
+            // We replaced 'RoleListLayout::class' with this inline table
+            // so we can easily add the 'Edit Permissions' button.
+            Layout::table('roles', [
+                
+                TD::make('name', 'Name')
+                    ->sort()
+                    ->cantHide()
+                    ->filter(TD::FILTER_TEXT)
+                    ->render(fn (Role $role) => Link::make($role->name)
+                        ->route('platform.systems.roles.edit', $role->id)),
+
+                TD::make('slug', 'Slug')
+                    ->sort()
+                    ->cantHide()
+                    ->filter(TD::FILTER_TEXT),
+
+                TD::make('created_at', 'Created')
+                    ->sort()
+                    ->render(fn (Role $role) => $role->created_at->toDateTimeString()),
+
+                // 👇 THIS IS THE NEW EDIT BUTTON
+                TD::make(__('Actions'))
+                    ->align(TD::ALIGN_RIGHT)
+                    ->render(fn (Role $role) => Link::make(__('Edit Permissions'))
+                        ->route('platform.systems.roles.edit', $role->id)
+                        ->icon('pencil')
+                        ->class('btn btn-sm btn-link')),
+            ]),
         ];
     }
 }

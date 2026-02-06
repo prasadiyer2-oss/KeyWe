@@ -20,6 +20,13 @@ class AdminBuilderVerificationScreen extends Screen
     /**
      * Fetch data to be displayed on the screen.
      */
+    public function permission(): ?iterable
+    {
+        return [
+            'platform.admin.builder_verification',
+        ];
+    }
+    
     public function query(): iterable
     {
         return [

@@ -64,7 +64,8 @@ class PlatformProvider extends OrchidServiceProvider
             ->icon('bs.shield-check') // Shield icon implies security/verification
             ->route('platform.admin.verification')
             ->title('Super Admin Controls') // Separate section
-            ->badge(fn () => 3, Color::DANGER),
+            ->badge(fn () => 3, Color::DANGER)
+            ->permission('platform.admin.builder_verification'),
 
             Menu::make('Properties')
             ->icon('bs.house-door')
@@ -75,7 +76,9 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make('Project Verification')
             ->icon('bs.building-check') // Changed icon to distinguish from User verification
     ->route('platform.admin.project.verification')
-    ->title('Approvals'),
+    
+    ->title('Approvals')
+    ->permission('platform.admin.project_verification'),
 
             // Menu::make('Sample Screen')
             //     ->icon('bs.collection')
