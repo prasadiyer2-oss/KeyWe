@@ -23,7 +23,7 @@ class AdminBuilderVerificationScreen extends Screen
     public function query(): iterable
     {
         return [
-            // MODIFIED: Fetch ALL users with 'builder' role (removed strict 'pending' check)
+            // Fetch ALL users with 'builder' role
             'builders' => User::whereHas('roles', function ($q) {
                     $q->where('slug', 'builder');
                 })
@@ -55,50 +55,30 @@ class AdminBuilderVerificationScreen extends Screen
     {
         return [
             Layout::table('builders', [
-                
-                TD::make('name', 'Organization Name')
-                    ->sort()
-                    ->render(fn (User $user) => "<strong>{$user->name}</strong>"),
-
+                TD::make('name', 'Organization')->sort()->render(fn (User $user) => "<strong>{$user->name}</strong>"),
                 TD::make('email', 'Email'),
-
-                // MODIFIED: Status Column to show ALL states
-                TD::make('verification_status', 'Status')
-                    ->sort()
-                    ->render(function (User $user) {
-                        $status = $user->verification_status;
-                        
-                        if ($status === 'verified') {
-                            return '<span class="text-success">● Verified</span>';
-                        } elseif ($status === 'rejected') {
-                            return '<span class="text-danger">● Rejected</span>';
-                        } elseif ($status === 'pending') {
-                            return '<span class="text-warning">● Pending</span>';
-                        } else {
-                            // Handles NULL or empty
-                            return '<span class="text-muted">● Not Set (Null)</span>';
-                        }
-                    }),
-
+                TD::make('verification_status', 'Status')->render(function (User $user) {
+                    return match ($user->verification_status) {
+                        'verified' => '<span class="text-success">● Verified</span>',
+                        'rejected' => '<span class="text-danger">● Rejected</span>',
+                        'pending'  => '<span class="text-warning">● Pending</span>',
+                        default    => '<span class="text-muted">● Not Verified</span>',
+                    };
+                }),
                 TD::make('Actions')
                     ->align(TD::ALIGN_RIGHT)
-                    ->width('280px')
                     ->render(fn (User $user) => Group::make([
-                        
                         ModalToggle::make('Docs')
                             ->modal('reviewDocsModal')
                             ->method('approveBuilder')
-                            ->asyncParameters(['user' => $user->id]) 
-                            ->icon('eye')
-                            ->type(Color::LIGHT),
-
+                            ->asyncParameters(['user' => $user->id])
+                            ->icon('eye'),
                         Button::make('Approve')
                             ->method('approveBuilder')
                             ->confirm("Verify {$user->name}?")
                             ->parameters(['id' => $user->id])
                             ->icon('check-circle')
                             ->type(Color::SUCCESS),
-
                         Button::make('Reject')
                             ->method('rejectBuilder')
                             ->confirm('Block this user?')
@@ -108,17 +88,42 @@ class AdminBuilderVerificationScreen extends Screen
                     ])),
             ]),
 
-            // Modal logic remains the same
-            Layout::modal('reviewDocsModal', Layout::rows([
-                Input::make('user.name')->title('Organization')->readonly(),
-                Input::make('user.email')->title('Email')->readonly(),
-                Label::make('documents_html')->title('Documents')->allowHtml(),
-                Input::make('user.id')->type('hidden'),
-            ]))
+            // FIX STARTS HERE ------------------------------------------------
+            Layout::modal('reviewDocsModal', [
+                // Section 1: Read-Only Data (Uses Legend for clean display)
+                Layout::legend('user', [
+                    \Orchid\Screen\Sight::make('name', 'Organization'),
+                    \Orchid\Screen\Sight::make('email', 'Email'),
+                    
+                    // The Documents List
+                    \Orchid\Screen\Sight::make('attachment', 'Documents')
+                        ->render(function ($user) {
+                            // Loop through documents and generate HTML links
+                            if ($user->attachment->isEmpty()) {
+                                return '<span class="text-muted">No documents uploaded.</span>';
+                            }
+                            
+                            $html = '';
+                            foreach ($user->attachment as $file) {
+                                $url = $file->url();
+                                $name = $file->original_name;
+                                // We use simple HTML here
+                                $html .= "<div class='mb-1'><a href='{$url}' target='_blank' class='text-primary'>📄 {$name}</a></div>";
+                            }
+                            return $html;
+                        }),
+                ]),
+                
+                // Section 2: Hidden Input (Required for the Action to know which ID to approve)
+                Layout::rows([
+                    Input::make('user.id')->type('hidden'),
+                ]),
+            ])
             ->title('Review Documents')
             ->async('asyncGetBuilder')
             ->applyButton('Approve')
             ->closeButton('Close'),
+            // FIX ENDS HERE ------------------------------------------------
         ];
     }
 
