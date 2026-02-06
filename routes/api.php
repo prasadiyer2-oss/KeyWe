@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SocialAuthController;
+use App\Http\Controllers\Api\AuthController;
 
 
 /*
@@ -23,4 +24,17 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::prefix('auth')->group(function () {
     Route::get('{provider}/redirect', [SocialAuthController::class, 'redirect']);
     Route::get('{provider}/callback', [SocialAuthController::class, 'callback']);
+});
+
+Route::prefix('v1')->group(function () {
+
+    // Protected Routes (Require Token)
+    Route::middleware('auth:sanctum')->group(function () {
+        
+        // Final URL: /api/v1/user
+        Route::get('/user', [AuthController::class, 'me']);
+        Route::post('/logout', [AuthController::class, 'logout']);
+        
+    });
+
 });

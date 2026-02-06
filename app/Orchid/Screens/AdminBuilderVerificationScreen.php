@@ -23,7 +23,7 @@ class AdminBuilderVerificationScreen extends Screen
     public function permission(): ?iterable
     {
         return [
-            'platform.admin.builder_verification',
+            'platform.admin.builder.verification',
         ];
     }
     
