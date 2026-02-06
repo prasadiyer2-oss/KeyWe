@@ -6,6 +6,8 @@ use Orchid\Filters\Types\Like;
 use Orchid\Filters\Types\Where;
 use Orchid\Filters\Types\WhereDateStartEnd;
 use Orchid\Platform\Models\User as Authenticatable;
+use Orchid\Attachment\Attachable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
@@ -14,6 +16,7 @@ class User extends Authenticatable
      *
      * @var array
      */
+    use Attachable, HasApiTokens;
     protected $fillable = [
         'name',
         'email',
