@@ -2,14 +2,15 @@
 
 namespace App\Orchid\Screens;
 
+use App\Models\User;
 use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Fields\Input;
+use Orchid\Screen\Fields\Label;
 use Orchid\Screen\Fields\Group;
-use Orchid\Screen\Repository;
 use Orchid\Support\Color;
 use Orchid\Support\Facades\Toast;
 use Illuminate\Http\Request;
@@ -21,37 +22,14 @@ class AdminBuilderVerificationScreen extends Screen
      */
     public function query(): iterable
     {
-        // Dummy data simulating FR-S-02 (KYC Queue)
         return [
-            'builders' => [
-                new Repository([
-                    'id' => 1,
-                    'name' => 'Sunrise Estates Ltd',
-                    'rera' => 'P51800009999',
-                    'gst' => '27ABCDE1234F1Z5',
-                    'submitted' => '2 hours ago',
-                    'status' => 'Pending',
-                    'doc_link' => 'rera_cert.pdf',
-                ]),
-                new Repository([
-                    'id' => 2,
-                    'name' => 'Urban Spaces Corp',
-                    'rera' => 'P51800008888',
-                    'gst' => '27FGHIJ5678K1Z9',
-                    'submitted' => '1 day ago',
-                    'status' => 'Pending',
-                    'doc_link' => 'pan_card.jpg',
-                ]),
-                new Repository([
-                    'id' => 3,
-                    'name' => 'Lakeside Constructions',
-                    'rera' => 'Invalid-Format',
-                    'gst' => 'Pending',
-                    'submitted' => '2 days ago',
-                    'status' => 'Flagged', // Needs attention
-                    'doc_link' => 'missing.pdf',
-                ]),
-            ]
+            // MODIFIED: Fetch ALL users with 'builder' role (removed strict 'pending' check)
+            'builders' => User::whereHas('roles', function ($q) {
+                    $q->where('slug', 'builder');
+                })
+                ->with('attachment')
+                ->orderBy('created_at', 'desc')
+                ->paginate(10),
         ];
     }
 
@@ -63,117 +41,126 @@ class AdminBuilderVerificationScreen extends Screen
         return 'Builder Verification Queue';
     }
 
-    /**
-     * The description is displayed on the user's screen under the heading
-     */
     public function description(): ?string
     {
-        return 'Review KYC documents and approve developer onboarding requests.';
+        return 'Manage all builder accounts and review KYC documents.';
     }
 
-    /**
-     * Button commands.
-     */
     public function commandBar(): iterable
     {
         return [];
     }
 
-    /**
-     * Views.
-     */
     public function layout(): iterable
     {
         return [
-            // Table of Pending Builders
             Layout::table('builders', [
-                TD::make('name', 'Company Name')
-                    ->sort()
-                    ->render(fn ($builder) => "<strong>{$builder['name']}</strong>"),
-
-                TD::make('rera', 'RERA ID'),
-                TD::make('gst', 'GST Number'),
                 
-                TD::make('submitted', 'Submitted'),
+                TD::make('name', 'Organization Name')
+                    ->sort()
+                    ->render(fn (User $user) => "<strong>{$user->name}</strong>"),
 
-                TD::make('status', 'KYC Status')
-                    ->render(function ($builder) {
-                        return match ($builder['status']) {
-                            'Pending' => '<span class="text-warning">● Pending Review</span>',
-                            'Flagged' => '<span class="text-danger">● Flagged</span>',
-                            default => '<span class="text-muted">Unknown</span>',
-                        };
+                TD::make('email', 'Email'),
+
+                // MODIFIED: Status Column to show ALL states
+                TD::make('verification_status', 'Status')
+                    ->sort()
+                    ->render(function (User $user) {
+                        $status = $user->verification_status;
+                        
+                        if ($status === 'verified') {
+                            return '<span class="text-success">● Verified</span>';
+                        } elseif ($status === 'rejected') {
+                            return '<span class="text-danger">● Rejected</span>';
+                        } elseif ($status === 'pending') {
+                            return '<span class="text-warning">● Pending</span>';
+                        } else {
+                            // Handles NULL or empty
+                            return '<span class="text-muted">● Not Set (Null)</span>';
+                        }
                     }),
 
-                // Actions Column
                 TD::make('Actions')
                     ->align(TD::ALIGN_RIGHT)
-                    ->width('250px')
-                    ->render(fn ($builder) => Group::make([
+                    ->width('280px')
+                    ->render(fn (User $user) => Group::make([
                         
-                        // 1. View Docs Button (Opens Modal)
                         ModalToggle::make('Docs')
                             ->modal('reviewDocsModal')
-                            ->method('approveBuilder') // This is just a placeholder, logic handled in modal
-                            ->asyncParameters(['builder_id' => $builder['id']])
+                            ->method('approveBuilder')
+                            ->asyncParameters(['user' => $user->id]) 
                             ->icon('eye')
                             ->type(Color::LIGHT),
 
-                        // 2. Quick Approve Button
                         Button::make('Approve')
                             ->method('approveBuilder')
-                            ->confirm('Are you sure you want to approve ' . $builder['name'] . '?')
-                            ->parameters(['builder_id' => $builder['id']])
+                            ->confirm("Verify {$user->name}?")
+                            ->parameters(['id' => $user->id])
                             ->icon('check-circle')
-                            ->type(Color::SUCCESS), // Green for Trust
+                            ->type(Color::SUCCESS),
 
-                        // 3. Reject Button
                         Button::make('Reject')
                             ->method('rejectBuilder')
-                            ->confirm('This will reject the onboarding request.')
-                            ->parameters(['builder_id' => $builder['id']])
+                            ->confirm('Block this user?')
+                            ->parameters(['id' => $user->id])
                             ->icon('x-circle')
-                            ->type(Color::DANGER), // Red for Reject
+                            ->type(Color::DANGER),
                     ])),
             ]),
 
-            // Document Review Modal
+            // Modal logic remains the same
             Layout::modal('reviewDocsModal', Layout::rows([
-                Input::make('builder.name')
-                    ->title('Company Name')
-                    ->readonly(),
-                
-                Input::make('builder.rera')
-                    ->title('RERA ID')
-                    ->readonly(),
-
-                // Simulating a document viewer link
-                \Orchid\Screen\Fields\Label::make('builder.doc_link')
-                    ->title('Uploaded Documents')
-                    ->value('<a href="#" target="_blank" class="text-primary text-decoration-underline">Download RERA Certificate (PDF)</a>')
-                    ->popover('Click to open the uploaded file in a new tab.'),
-
-            ]))->title('KYC Document Review')
-               ->applyButton('Approve Builder') // The modal's main button also approves
-               ->closeButton('Close'),
+                Input::make('user.name')->title('Organization')->readonly(),
+                Input::make('user.email')->title('Email')->readonly(),
+                Label::make('documents_html')->title('Documents')->allowHtml(),
+                Input::make('user.id')->type('hidden'),
+            ]))
+            ->title('Review Documents')
+            ->async('asyncGetBuilder')
+            ->applyButton('Approve')
+            ->closeButton('Close'),
         ];
     }
 
     /**
-     * Action: Approve Builder
+     * Async Data Loader
      */
-    public function approveBuilder(Request $request)
+    public function asyncGetBuilder(User $user): array
     {
-        // Logic to update database status to 'active'/'verified'
-        Toast::success('Builder has been successfully verified and onboarded.');
+        $docsHtml = '';
+        if ($user->attachment->isEmpty()) {
+            $docsHtml = '<span class="text-muted">No documents found.</span>';
+        } else {
+            foreach ($user->attachment as $file) {
+                $url = $file->url();
+                $name = $file->original_name;
+                $docsHtml .= "<div class='mb-2'><a href='{$url}' target='_blank'>⬇️ {$name}</a></div>";
+            }
+        }
+
+        return [
+            'user' => $user,
+            'documents_html' => $docsHtml,
+        ];
     }
 
     /**
-     * Action: Reject Builder
+     * Actions
      */
+    public function approveBuilder(Request $request)
+    {
+        $id = $request->input('id') ?? $request->input('user.id');
+        $user = User::findOrFail($id);
+        $user->verification_status = 'verified';
+        $user->save();
+        Toast::success("User verified.");
+    }
+
     public function rejectBuilder(Request $request)
     {
-        // Logic to send rejection email (FR-N-01)
-        Toast::warning('Builder application rejected. Notification sent.');
+        $user = User::findOrFail($request->input('id'));
+        $user->verification_status = 'rejected';
+        $user->save();
+        Toast::warning("User rejected.");
     }
 }
