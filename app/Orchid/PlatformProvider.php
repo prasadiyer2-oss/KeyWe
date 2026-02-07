@@ -67,6 +67,11 @@ class PlatformProvider extends OrchidServiceProvider
                 ->title('Approvals')
                 // 👇 FIXED: Matching the permission key defined below
                 ->permission('platform.admin.project.verification'),
+                 Menu::make('Properties')
+            ->icon('bs.house-door')
+            ->route('platform.builder.properties')
+            ->title('Inventory')
+            ->permission('platform.admin.project.verification'),
 
             // --- SYSTEM SECTION ---
 
