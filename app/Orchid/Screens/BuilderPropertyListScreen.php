@@ -3,16 +3,18 @@
 namespace App\Orchid\Screens;
 
 use App\Models\Property;
-use App\Models\Project;
+use App\Models\Project; // <--- Ensure this is imported
 use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
 use Orchid\Screen\Actions\ModalToggle;
-use Orchid\Screen\Actions\Link; // <--- Changed from Button/ModalToggle
+use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Fields\Group;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Select;
-use Orchid\Screen\Fields\Relation;
+use Orchid\Screen\Fields\TextArea;
+use Orchid\Screen\Fields\DateTimer;
+use Orchid\Screen\Fields\Relation; // <--- Ensure this is imported
 use Orchid\Screen\Fields\Upload;
 use Orchid\Support\Color;
 use Orchid\Support\Facades\Toast;
@@ -24,12 +26,11 @@ class BuilderPropertyListScreen extends Screen
     public function query(): iterable
     {
         return [
-            'properties' => Property::whereHas('project', function ($query) {
-                $query->where('user_id', Auth::id());
-            })
-            ->with('project')
-            ->latest()
-            ->paginate(10)
+            // Filter properties by the logged-in builder (partner_id)
+            'properties' => Property::where('partner_id', Auth::id())
+                ->with('project') // Eager load project for the table
+                ->latest()
+                ->paginate(10)
         ];
     }
 
@@ -53,7 +54,6 @@ class BuilderPropertyListScreen extends Screen
     public function commandBar(): iterable
     {
         return [
-            // Keep Create as Modal for quick adding
             ModalToggle::make('Add Unit')
                 ->modal('createPropertyModal')
                 ->method('createProperty')
@@ -69,51 +69,102 @@ class BuilderPropertyListScreen extends Screen
             Layout::table('properties', [
                 TD::make('title', 'Unit Title')
                     ->sort()
-                    ->render(fn (Property $property) => "<strong>{$property->title}</strong>"),
+                    ->render(fn(Property $property) => "<strong>{$property->title}</strong>"),
 
+                // Project Column
                 TD::make('project.name', 'Project')
-                    ->render(fn (Property $property) => $property->project->name ?? '-'),
+                    ->sort()
+                    ->render(fn(Property $property) => $property->project->name ?? '<span class="text-muted">-</span>'),
 
-                TD::make('configuration', 'Config')->sort(),
+                TD::make('location', 'Location')
+                    ->sort()
+                    ->width('150px'),
+
+                TD::make('property_type', 'Type')->sort(),
+                TD::make('bhk', 'BHK')->sort(),
+
+                TD::make('carpet_area', 'Area (sqft)')
+                    ->sort()
+                    ->render(fn(Property $property) => number_format($property->carpet_area)),
 
                 TD::make('price', 'Price')
                     ->sort()
-                    ->render(fn (Property $property) => '₹ ' . number_format($property->price)),
-
-                TD::make('status', 'Status')
-                    ->render(fn (Property $property) => match ($property->status) {
-                        'Available' => "<span class='text-success'>● {$property->status}</span>",
-                        'Reserved' => "<span class='text-warning'>● {$property->status}</span>",
-                        'Sold' => "<span class='text-danger'>● {$property->status}</span>",
-                        default => "<span class='text-muted'>● {$property->status}</span>",
-                    }),
+                    ->render(fn(Property $property) => '₹ ' . number_format($property->price)),
 
                 TD::make('Actions')
                     ->align(TD::ALIGN_RIGHT)
-                    ->render(fn (Property $property) => Link::make('Edit')
-                        ->route('platform.builder.properties.edit', $property->id) // Points to new page
+                    ->render(fn(Property $property) => Link::make('Edit')
+                        ->route('platform.builder.properties.edit', $property->id)
                         ->icon('pencil')
                         ->type(Color::LIGHT)),
             ]),
 
-            // 2. CREATE MODAL (Kept for quick add)
+            // 2. MODAL (Updated)
             Layout::modal('createPropertyModal', Layout::rows([
-                Relation::make('property.project_id')
+
+                // 👇 ADDED: Project Selection Field
+                Select::make('property.project_id')
                     ->title('Select Project')
-                    ->fromModel(Project::class, 'name')
-                    ->applyScope('byBuilder')
-                    ->applyScope('verified')
+                    // This allows you to write the query directly here 👇
+                    ->fromQuery(Project::where('user_id', Auth::id()), 'name')
                     ->required(),
 
-                Input::make('property.title')->title('Unit Title')->required(),
-                
-                Select::make('property.configuration')
-                    ->title('Configuration')
-                    ->options(['1BHK'=>'1 BHK', '2BHK'=>'2 BHK', '3BHK'=>'3 BHK', '4BHK+'=>'4 BHK+', 'Villa'=>'Villa', 'Plot'=>'Plot'])
+                Input::make('property.title')
+                    ->title('Unit Title')
+                    ->placeholder('e.g. Sunrise Apt 401')
                     ->required(),
 
-                Input::make('property.area_sqft')->title('Area (sqft)')->type('number')->required(),
-                Input::make('property.price')->title('Price (₹)')->type('number')->required(),
+                TextArea::make('property.description')
+                    ->title('Description')
+                    ->rows(3),
+
+                Input::make('property.location')
+                    ->title('Location')
+                    ->placeholder('e.g. Bandra West')
+                    ->required(),
+
+                Group::make([
+                    Select::make('property.property_type')
+                        ->title('Property Type')
+                        ->options([
+                            'Apartment' => 'Apartment',
+                            'Villa' => 'Villa',
+                            'Plot' => 'Plot',
+                            'Studio' => 'Studio',
+                        ])
+                        ->required(),
+
+                    Input::make('property.bhk')
+                        ->title('BHK')
+                        ->type('number')
+                        ->required(),
+                ]),
+
+                Group::make([
+                    Input::make('property.carpet_area')
+                        ->title('Carpet Area (sqft)')
+                        ->type('number')
+                        ->required(),
+
+                    Input::make('property.price')
+                        ->title('Price (₹)')
+                        ->type('number')
+                        ->required(),
+                ]),
+
+                Group::make([
+                    DateTimer::make('property.handover_date')
+                        ->title('Handover Date')
+                        ->format('Y-m-d'),
+
+                    Select::make('property.financing_option')
+                        ->title('Financing')
+                        ->options([
+                            'Loan' => 'Loan',
+                            'Full Payment' => 'Full Payment',
+                            'Both' => 'Both',
+                        ]),
+                ]),
 
                 Upload::make('property.attachment')
                     ->title('Property Images')
@@ -130,18 +181,28 @@ class BuilderPropertyListScreen extends Screen
      */
     public function createProperty(Request $request)
     {
+        // 3. VALIDATION UPDATE: Include project_id
         $data = $request->validate([
-            'property.project_id' => 'required|exists:projects,id',
+            'property.project_id' => 'required|exists:projects,id', // <--- Added validation
             'property.title' => 'required|string',
-            'property.configuration' => 'required|string',
-            'property.area_sqft' => 'required|numeric',
+            'property.description' => 'nullable|string',
+            'property.location' => 'required|string',
+            'property.property_type' => 'required|string',
+            'property.bhk' => 'required|integer',
+            'property.carpet_area' => 'required|numeric',
             'property.price' => 'required|numeric',
-            'property.attachment' => 'array', 
+            'property.handover_date' => 'nullable|date',
+            'property.financing_option' => 'nullable|string',
+            'property.attachment' => 'array',
         ])['property'];
 
-        $data['status'] = 'Available';
+        // Auto-assign the logged-in user as the partner
+        $data['partner_id'] = Auth::id();
+
+        // Create
         $property = Property::create($data);
 
+        // Attach Images
         $property->attachment()->sync($request->input('property.attachment', []));
 
         Toast::info('Unit created successfully.');
