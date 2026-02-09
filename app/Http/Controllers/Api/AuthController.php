@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -39,36 +40,38 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        // 1. Validate Input
+        Log::info('Received registration request', $request->all());    
+
         $fields = $request->validate([
-            'name' => 'required|string',
-            'email' => 'required|email|unique:users,email',
+            'name' => 'nullable|string',
+            'email' => 'nullable|email|unique:users,email',
             'phone' => 'required|digits:10|unique:users,phone',
-            'password' => 'required|string|confirmed|min:6', // Expects 'password_confirmation' field
+            'password' => 'nullable|string|confirmed|min:6',
         ]);
 
-        // 2. Generate OTP (Random 6 digits)
         $otp = 123456;
 
-        // 3. Create User (Unverified)
-        $user = \App\Models\User::create([
-            'name' => $fields['name'],
-            'email' => $fields['email'],
+        $userData = [
+            'name' => $fields['name'] ?? null,
+            'email' => $fields['email'] ?? null,
             'phone' => $fields['phone'],
-            'password' => bcrypt($fields['password']),
             'otp_code' => $otp,
-            'otp_expires_at' => now()->addMinutes(10), // Valid for 10 mins
+            'otp_expires_at' => now()->addMinutes(10),
             'is_phone_verified' => false,
-        ]);
+        ];
 
-        // 4. SEND OTP (Simulated for Testing)
-        // In production, replace this line with: SmsService::send($user->phone, $otp);
+        // FIX: Check if password exists in the array before accessing it
+        if (!empty($fields['password'])) {
+            $userData['password'] = bcrypt($fields['password']);
+        }
+
+        $user = \App\Models\User::create($userData);
+
         \Illuminate\Support\Facades\Log::info(" [OTP SERVICE] Sending OTP to {$user->phone}: {$otp}");
 
         return response()->json([
             'message' => 'User registered. OTP sent to mobile.',
             'phone' => $user->phone,
-            // 'dev_otp' => $otp // Uncomment this if you want to see OTP in response for easier testing
         ], 201);
     }
 
