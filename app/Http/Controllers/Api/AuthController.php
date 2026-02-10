@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\LoginRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
@@ -113,6 +116,33 @@ class AuthController extends Controller
             'message' => 'Phone verified successfully. Logged in.',
             'token' => $token,
             'user' => $user,
+        ]);
+    }
+
+    public function login(LoginRequest $request)
+    {
+        // 1. Retrieve validated data (automatically checked by LoginRequest)
+        $validated = $request->validated();
+
+        // 2. Find User
+        $user = User::where('email', $validated['email'])->first();
+
+        // 3. Check Password
+        if (!$user || !Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'message' => 'Invalid credentials'
+            ], 401);
+        }
+
+        // 4. Generate Token
+        // Deletes old tokens so only one device is logged in (Optional security step)
+        $user->tokens()->delete(); 
+        $token = $user->createToken('api_token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Login successful',
+            'user' => $user,
+            'token' => $token,
         ]);
     }
 
