@@ -24,8 +24,13 @@ class FilterOption extends Model
      * Relationship: An Option belongs to many Projects.
      * This uses the 'project_filter_option' pivot table.
      */
-    public function projects()
+    public function properties()
     {
-        return $this->belongsToMany(Project::class, 'project_filter_option');
+        return $this->belongsToMany(
+            Property::class,
+            'property_filter_option',
+            'filter_option_id',
+            'property_id'
+        );
     }
 }

@@ -26,18 +26,25 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // 3. Many-to-Many Pivot: A project can have multiple filter options
-        // (e.g., A project can be both "2 BHK" and "3 BHK", and in "1-2 Cr" range)
-        Schema::create('project_filter_option', function (Blueprint $table) {
+        // 3. Many-to-Many Pivot: A PROPERTY (Unit) can have multiple filter options
+        // CHANGED: 'project_id' -> 'property_id' to match your properties table.
+        Schema::create('property_filter_option', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('project_id')->constrained()->onDelete('cascade');
-            $table->foreignId('filter_option_id')->constrained()->onDelete('cascade');
+            
+            // This links to your existing 'properties' table
+            $table->foreignId('property_id')->constrained('properties')->onDelete('cascade');
+            
+            // This links to the specific option (e.g., "2 BHK")
+            $table->foreignId('filter_option_id')->constrained('filter_options')->onDelete('cascade');
+            
+            // Optional: Index for faster filtering queries
+            $table->index(['property_id', 'filter_option_id']); 
         });
     }
 
     public function down()
     {
-        Schema::dropIfExists('project_filter_option');
+        Schema::dropIfExists('property_filter_option');
         Schema::dropIfExists('filter_options');
         Schema::dropIfExists('filters');
     }

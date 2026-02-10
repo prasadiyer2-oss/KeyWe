@@ -11,10 +11,18 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Seed application roles and a default super admin user
+        // 1. Roles & Permissions (Standard)
         $this->call([
             RolesSeeder::class,
-            
+        ]);
+
+        // 2. Generate Filters & Options from Properties (Dynamic)
+        $this->call([
+            PropertyFilterSeeder::class,
+        ]);
+
+        $this->call([
+            FilterOptionSeeder::class,
         ]);
     }
 }

@@ -56,4 +56,14 @@ class Property extends Model
     {
         return $this->belongsTo(Project::class);
     }
+
+    public function filterOptions()
+    {
+        return $this->belongsToMany(
+            FilterOption::class,
+            'property_filter_option', // Pivot table name
+            'property_id',            // Foreign key on pivot for this model
+            'filter_option_id'        // Foreign key on pivot for the other model
+        );
+    }
 }
