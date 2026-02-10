@@ -15,7 +15,7 @@ class Property extends Model
      * The attributes that are mass assignable.
      */
     protected $fillable = [
-        'partner_id',  
+        'partner_id',
         'project_id',      // Renamed from project_id
         'title',
         'description',       // New column
@@ -25,7 +25,11 @@ class Property extends Model
         'property_type',     // New column
         'location',          // New column
         'handover_date',     // New column
-        'financing_option',  // New column
+        'financing_option',
+        'floor_number',
+        'total_floors',
+        'construction_status',
+        'possession_date',  // New column
     ];
 
     /**
@@ -44,7 +48,7 @@ class Property extends Model
      */
     public function partner()
     {
-        return $this->belongsTo(User::class, 'partner_id'); 
+        return $this->belongsTo(User::class, 'partner_id');
         // If you have a dedicated 'Partner' model, change User::class to Partner::class
     }
 
