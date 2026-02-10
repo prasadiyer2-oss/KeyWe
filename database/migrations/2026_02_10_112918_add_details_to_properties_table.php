@@ -18,18 +18,25 @@ return new class extends Migration
                   ->comment('Total floors in the building (e.g. 5 out of 22)');
 
             // 2. Possession & Construction
-            // Using a string for status allows you to add "New Launch" later without changing DB enums
+            // Using a string allows for flexible statuses like "New Launch"
             $table->string('construction_status')->nullable()->after('total_floors')
                   ->comment('Ready to Move, Under Construction, Pre-Launch');
 
             $table->date('possession_date')->nullable()->after('construction_status')
                   ->comment('Date when possession will be given');
+
+            // 3. Modify BHK from Integer to String (e.g. allow "3.5 BHK" or "Studio")
+            $table->string('bhk')->change();
         });
     }
 
     public function down(): void
     {
         Schema::table('properties', function (Blueprint $table) {
+            // Revert BHK back to integer
+            $table->integer('bhk')->change();
+
+            // Drop the new columns
             $table->dropColumn([
                 'floor_number', 
                 'total_floors', 

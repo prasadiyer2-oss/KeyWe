@@ -28,12 +28,10 @@ class BuilderPropertyEditScreen extends Screen
     public function query(Property $property): iterable
     {
         // Security: Ensure the builder owns this specific unit/property
-        // We use partner_id which we verified in the previous steps
         if ($property->exists && $property->partner_id !== Auth::id()) {
             abort(403);
         }
 
-        // Load images so they appear in the upload field
         $property->load('attachment');
 
         return [
@@ -70,7 +68,7 @@ class BuilderPropertyEditScreen extends Screen
         return [
             Layout::rows([
                 
-                // 1. Project Selection (Filtered by Logged-in Builder)
+                // 1. Project Selection
                 Select::make('property.project_id')
                     ->title('Project')
                     ->fromQuery(Project::where('user_id', Auth::id()), 'name')
@@ -107,16 +105,29 @@ class BuilderPropertyEditScreen extends Screen
                         ])
                         ->required(),
 
+                    // Changed to simple Input for strings like "3.5" or "Studio"
                     Input::make('property.bhk')
                         ->title('BHK Configuration')
-                        ->type('number')
-                        ->placeholder('e.g. 2 or 3')
+                        ->placeholder('e.g. 2, 3.5, Studio')
                         ->required(),
                 ]),
 
-                // 4. Size & Price
+                // 4. Floor Details (New)
                 Group::make([
-                    Input::make('property.carpet_area') // Renamed from area_sqft
+                    Input::make('property.floor_number')
+                        ->title('Floor Number')
+                        ->type('number')
+                        ->placeholder('e.g. 5'),
+
+                    Input::make('property.total_floors')
+                        ->title('Total Floors')
+                        ->type('number')
+                        ->placeholder('e.g. 12'),
+                ]),
+
+                // 5. Size & Price
+                Group::make([
+                    Input::make('property.carpet_area')
                         ->title('Carpet Area (sqft)')
                         ->type('number')
                         ->required(),
@@ -127,23 +138,31 @@ class BuilderPropertyEditScreen extends Screen
                         ->required(),
                 ]),
 
-                // 5. Timeline & Finance
+                // 6. Status & Timeline (New)
                 Group::make([
-                    DateTimer::make('property.handover_date')
-                        ->title('Handover / Possession Date')
-                        ->format('Y-m-d'),
-
-                    Select::make('property.financing_option')
-                        ->title('Financing Option')
+                    Select::make('property.construction_status')
+                        ->title('Construction Status')
                         ->options([
-                            'Loan'         => 'Loan',
-                            'Full Payment' => 'Full Payment',
-                            'Both'         => 'Both',
-                        ])
-                        ->empty('Select Option'),
+                            'New Launch' => 'New Launch',
+                            'Under Construction' => 'Under Construction',
+                            'Ready to Move' => 'Ready to Move',
+                        ]),
+
+                    DateTimer::make('property.possession_date')
+                        ->title('Possession Date')
+                        ->format('Y-m-d'),
                 ]),
 
-                // 6. Images
+                // 7. Finance & Images
+                Select::make('property.financing_option')
+                    ->title('Financing Option')
+                    ->options([
+                        'Loan'         => 'Loan',
+                        'Full Payment' => 'Full Payment',
+                        'Both'         => 'Both',
+                    ])
+                    ->empty('Select Option'),
+
                 Upload::make('property.attachment')
                     ->title('Property Images')
                     ->groups('photos')
@@ -155,7 +174,6 @@ class BuilderPropertyEditScreen extends Screen
 
     public function save(Property $property, Request $request)
     {
-        // Security check for existing properties
         if ($property->exists && $property->partner_id !== Auth::id()) {
             abort(403);
         }
@@ -166,22 +184,23 @@ class BuilderPropertyEditScreen extends Screen
             'property.description'      => 'nullable|string',
             'property.location'         => 'required|string|max:255',
             'property.property_type'    => 'required|string',
-            'property.bhk'              => 'required|integer',
+            'property.bhk'              => 'required|string', // Changed to string
+            'property.floor_number'     => 'nullable|integer', // New
+            'property.total_floors'     => 'nullable|integer', // New
             'property.carpet_area'      => 'required|numeric',
             'property.price'            => 'required|numeric',
-            'property.handover_date'    => 'nullable|date',
+            'property.construction_status' => 'nullable|string', // New
+            'property.possession_date'  => 'nullable|date',      // New
             'property.financing_option' => 'nullable|string',
             'property.attachment'       => 'array',
         ])['property'];
 
-        // Ensure partner_id is set to the current user (if creating new)
         if (!$property->exists) {
             $property->partner_id = Auth::id();
         }
 
         $property->fill($data)->save();
 
-        // Sync Images
         $property->attachment()->sync($request->input('property.attachment', []));
 
         Toast::info('Unit saved successfully.');
