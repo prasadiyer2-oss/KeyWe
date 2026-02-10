@@ -38,8 +38,7 @@ return new class extends Migration
             
             // Location & Date
             $table->string('locality')->nullable(); // Text location
-            $table->decimal('latitude', 10, 8)->nullable();   // For "Nearby" search
-            $table->decimal('longitude', 11, 8)->nullable();  // For "Nearby" search
+            $table->string('nearby_location')->nullable();  // For "Nearby" search
             $table->integer('search_radius_km')->default(10); // How far to look?
             $table->date('ready_to_move_by')->nullable();     // "I need it by June 2026"
             
