@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\PropertyController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SocialAuthController;
@@ -30,15 +31,13 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::prefix('v1')->group(function () {
-
     // Protected Routes (Require Token)
     Route::middleware('auth:sanctum')->group(function () {
-        
-        // Final URL: /api/v1/user
-        Route::get('/user', [AuthController::class, 'me']);
-       
+        Route::get('/user', [AuthController::class, 'me']);  
         Route::post('/logout', [AuthController::class, 'logout']);
         
     });
+    Route::get('/properties', [PropertyController::class, 'index']);
+    Route::get('/properties/{id}', [PropertyController::class, 'show']);
 
 });

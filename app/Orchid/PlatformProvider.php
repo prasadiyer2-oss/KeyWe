@@ -71,7 +71,7 @@ class PlatformProvider extends OrchidServiceProvider
             ->icon('bs.house-door')
             ->route('platform.builder.properties')
             ->title('Inventory')
-            ->permission('platform.admin.project.verification'),
+            ->permission('platform.builder.properties'),
 
             // --- SYSTEM SECTION ---
 

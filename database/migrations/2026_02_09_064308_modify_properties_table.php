@@ -15,10 +15,8 @@ return new class extends Migration
         // STEP 1: Rename columns using Raw SQL (Fixes MariaDB Syntax Error)
         // We use "CHANGE" instead of "RENAME COLUMN"
         
-        if (Schema::hasColumn('properties', 'project_id')) {
-            // Syntax: CHANGE old_name new_name TYPE
-            DB::statement("ALTER TABLE properties CHANGE project_id partner_id BIGINT UNSIGNED NOT NULL");
-        }
+        
+        
 
         if (Schema::hasColumn('properties', 'area_sqft')) {
             DB::statement("ALTER TABLE properties CHANGE area_sqft carpet_area INT NOT NULL");
@@ -27,6 +25,8 @@ return new class extends Migration
         // STEP 2: Drop Old Columns & Add New Ones
         Schema::table('properties', function (Blueprint $table) {
             // Drop unneeded columns
+            // ✅ ADD THIS
+            $table->foreignId('partner_id')->after('id')->constrained('users')->onDelete('cascade');
             if (Schema::hasColumn('properties', 'configuration')) {
                 $table->dropColumn('configuration');
             }

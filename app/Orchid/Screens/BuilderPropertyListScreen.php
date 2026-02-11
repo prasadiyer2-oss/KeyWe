@@ -82,7 +82,7 @@ class BuilderPropertyListScreen extends Screen
                 
                 Select::make('property.project_id')
                     ->title('Select Project')
-                    ->fromQuery(Project::where('user_id', Auth::id()), 'name')
+                    ->fromQuery(Project::where('user_id', Auth::id())->verified(), 'name')
                     ->required(),
 
                 Input::make('property.title')
