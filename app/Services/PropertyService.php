@@ -10,28 +10,32 @@ class PropertyService
     /**
      * Get a paginated list of properties with filters
      */
-    public function listProperties(Request $request)
+    // app/Services/PropertyService.php
+
+    public function listProperties(Request $request, ?string $autoCity = null)
     {
-        // 1. Start the query
         $query = Property::query();
 
-        // 2. Eager Load Relationships (Optimize performance)
-        // 'project': Gets the parent project details
-        // 'attachment': Gets the images
-        // 'filterOptions': Gets tags like "2 BHK", "Ready to Move"
+        // Eager Load Relations
         $query->with(['project', 'attachment', 'filterOptions']);
 
-        // 3. Apply Basic Filters (Optional - add more as needed)
+        // 1. Manual Search (Highest Priority)
         if ($request->has('search')) {
-            $searchTerm = $request->search;
-            $query->where(function($q) use ($searchTerm) {
-                $q->where('title', 'like', "%{$searchTerm}%")
-                  ->orWhere('location', 'like', "%{$searchTerm}%");
+            $term = $request->search;
+            $query->where(function ($q) use ($term) {
+                $q->where('title', 'like', "%{$term}%")
+                    ->orWhere('location', 'like', "%{$term}%");
             });
         }
+        // 2. Auto-Detected Location (Fallback Priority)
+        // Only apply if NO manual search was done
+        elseif ($autoCity) {
+            $query->where('location', 'like', "%{$autoCity}%");
+        }
 
-        // 4. Return Paginated Result
-        // paginate(10) automatically handles ?page=1, ?page=2
+        // 3. Other Filters (Price, BHK, etc.)
+        // ... (Your existing filter logic) ...
+
         return $query->latest()->paginate(10);
     }
 

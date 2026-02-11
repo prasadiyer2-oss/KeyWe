@@ -37,7 +37,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         
     });
-    Route::get('/properties', [PropertyController::class, 'index']);
+    Route::get('/properties-kre', [PropertyController::class, 'index']);
     Route::get('/properties/{id}', [PropertyController::class, 'show']);
 
 });
