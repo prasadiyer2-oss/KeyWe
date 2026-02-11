@@ -11,6 +11,13 @@ use Orchid\Screen\Repository;
 
 class BuilderDashboardScreen extends Screen
 {
+    public function permission(): ?iterable
+    {
+        // 👇 This locks the screen. Only users with this specific key can view it.
+        return [
+            'platform.builder.dashboard',
+        ];
+    }
     /**
      * Fetch data to be displayed on the screen.
      * * @return array
@@ -21,10 +28,10 @@ class BuilderDashboardScreen extends Screen
         // TODO: Replace these hardcoded values with actual DB queries later.
         return [
             'metrics' => [
-                'Project Views'   => '1,240',
-                'Lead Conversions'=> '45',
-                'CTR'             => '3.6%',
-                'Quality Score'   => '8.5/10',
+                'Project Views' => '1,240',
+                'Lead Conversions' => '45',
+                'CTR' => '3.6%',
+                'Quality Score' => '8.5/10',
             ],
             // SRS FR-D-02: Lead inbox preview 
             'recent_leads' => [
@@ -65,7 +72,7 @@ class BuilderDashboardScreen extends Screen
             Link::make('Create New Project')
                 ->icon('plus')
                 ->route('platform.main'), // TODO: Change this to your actual 'create project' route
-                
+
             Link::make('Upgrade Subscription')
                 ->icon('star')
                 ->type(Color::WARNING),
@@ -82,10 +89,10 @@ class BuilderDashboardScreen extends Screen
         return [
             // Section 1: Top Metrics (FR-D-03)
             Layout::metrics([
-                'Total Views'    => 'metrics.Project Views',
-                'Conversions'    => 'metrics.Lead Conversions',
-                'Click Rate'     => 'metrics.CTR',
-                'Lead Quality'   => 'metrics.Quality Score',
+                'Total Views' => 'metrics.Project Views',
+                'Conversions' => 'metrics.Lead Conversions',
+                'Click Rate' => 'metrics.CTR',
+                'Lead Quality' => 'metrics.Quality Score',
             ]),
 
             // Section 2: Recent Leads Table (FR-D-02)

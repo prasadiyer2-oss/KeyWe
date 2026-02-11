@@ -29,7 +29,8 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make('Dashboard')
                 ->icon('bs.book')
                 ->title('Navigation')
-                ->route(config('platform.index')),
+                ->route(config('platform.index'))
+                ->permission('platform.builder.dashboard'),
 
             Menu::make('My Projects')
                 ->icon('bs.building')
@@ -40,7 +41,7 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make('Lead Inbox')
                 ->icon('bs.envelope-paper')
                 ->route('platform.builder.leads')
-                ->badge(fn () => 5, Color::DANGER),
+                ->badge(fn() => 5, Color::DANGER),
 
             Menu::make('Subscription')
                 ->icon('bs.credit-card')
@@ -50,16 +51,16 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make('Company Profile')
                 ->icon('bs.building-gear')
                 ->route('platform.builder.profile'),
-            
+
             // --- SUPER ADMIN SECTION ---
-            
+
             Menu::make('Builder Verification')
                 ->icon('bs.shield-check')
                 ->route('platform.admin.verification')
-                ->title('Super Admin Controls') 
-                ->badge(fn () => 3, Color::DANGER)
+                ->title('Super Admin Controls')
+                ->badge(fn() => 3, Color::DANGER)
                 // 👇 FIXED: Matching the permission key defined below
-                ->permission('platform.admin.builder.verification'), 
+                ->permission('platform.admin.builder.verification'),
 
             Menu::make('Project Verification')
                 ->icon('bs.building-check')
@@ -67,11 +68,11 @@ class PlatformProvider extends OrchidServiceProvider
                 ->title('Approvals')
                 // 👇 FIXED: Matching the permission key defined below
                 ->permission('platform.admin.project.verification'),
-                 Menu::make('Properties')
-            ->icon('bs.house-door')
-            ->route('platform.builder.properties')
-            ->title('Inventory')
-            ->permission('platform.builder.properties'),
+            Menu::make('Properties')
+                ->icon('bs.house-door')
+                ->route('platform.builder.properties')
+                ->title('Inventory')
+                ->permission('platform.builder.properties'),
 
             // --- SYSTEM SECTION ---
 
@@ -97,7 +98,7 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.box-arrow-up-right')
                 ->url('https://github.com/orchidsoftware/platform/blob/master/CHANGELOG.md')
                 ->target('_blank')
-                ->badge(fn () => Dashboard::version(), Color::DARK),
+                ->badge(fn() => Dashboard::version(), Color::DARK),
         ];
     }
 
@@ -108,10 +109,15 @@ class PlatformProvider extends OrchidServiceProvider
     {
         return [
             ItemPermission::group(__('System'))
+
                 ->addPermission('platform.systems.roles', __('Roles'))
                 ->addPermission('platform.systems.users', __('Users')),
+            ItemPermission::group(__('System')),
+
+
 
             ItemPermission::group(__('Builder Controls'))
+                ->addPermission('platform.builder.dashboard', __('Access Builder Dashboard'))
                 ->addPermission('platform.builder.projects', __('Manage Projects (Create/Edit)'))
                 ->addPermission('platform.builder.properties', __('Manage Units/Properties')),
 
