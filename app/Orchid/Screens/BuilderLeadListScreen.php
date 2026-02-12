@@ -2,149 +2,160 @@
 
 namespace App\Orchid\Screens;
 
+use App\Models\Lead;
+use App\Models\Project;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\TextArea;
-use Orchid\Screen\Repository;
+use Orchid\Screen\Fields\Relation;
 use Orchid\Support\Color;
-use Illuminate\Http\Request;
 use Orchid\Support\Facades\Toast;
+use Orchid\Screen\Actions\Button;
+use Orchid\Support\Facades\Alert;
 
 class BuilderLeadListScreen extends Screen
 {
-    /**
-     * Fetch data to be displayed on the screen.
-     */
-    public function query(): iterable
+    public function permission(): ?iterable
     {
+        return ['platform.builder.leads'];
+    }
+
+    public function query(Request $request): iterable
+    {
+        $user = Auth::user();
+
+        $selectedProjectId = $request->get('project_id');
+
+        $leadsQuery = Lead::query()
+            ->with('project')
+            ->whereHas('project', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            });
+
+        if ($selectedProjectId) {
+            $leadsQuery->where('project_id', $selectedProjectId);
+        }
+
         return [
-            // Dummy data for FR-D-02 Lead Inbox
-            'leads' => [
-                new Repository([
-                    'id' => 101,
-                    'name' => 'Rahul Sharma',
-                    'project' => 'Green Valley Phase 1',
-                    'contact' => '+91 98765 43210',
-                    'status' => 'New', // Needs Amber color
-                    'time' => '10 mins ago',
-                    'note' => 'Looking for 2BHK, immediate possession.',
-                ]),
-                new Repository([
-                    'id' => 102,
-                    'name' => 'Priya Verma',
-                    'project' => 'Skyline Towers',
-                    'contact' => '+91 99887 76655',
-                    'status' => 'Booked', // Needs Green color
-                    'time' => '1 hour ago',
-                    'note' => 'Site visit scheduled for Sunday.',
-                ]),
-                new Repository([
-                    'id' => 103,
-                    'name' => 'Amit Patel',
-                    'project' => 'Green Valley Phase 1',
-                    'contact' => 'Hidden (Unlock to view)',
-                    'status' => 'Contacted',
-                    'time' => '2 hours ago',
-                    'note' => 'Asked about loan options.',
-                ]),
-            ]
+            'leads'       => $leadsQuery->latest()->paginate(10)->withQueryString(),
+            'project_id'  => $selectedProjectId,
         ];
     }
 
-    /**
-     * The name of the screen displayed in the header.
-     */
     public function name(): ?string
     {
         return 'Lead Inbox';
     }
 
-    /**
-     * The description is displayed on the user's screen under the heading
-     */
     public function description(): ?string
     {
         return 'Manage interested buyers and site visit requests.';
     }
 
-    /**
-     * Button commands.
-     */
     public function commandBar(): iterable
     {
         return [];
     }
 
-    /**
-     * Views.
-     */
     public function layout(): iterable
     {
         return [
-            // 1. Leads Table
+
+            // --- FILTER FORM ---
+            Layout::rows([
+                Relation::make('project_id')
+                    ->title('Filter by Project')
+                    ->fromModel(Project::class, 'name')
+                    ->applyScope('byBuilder')
+                    ->empty('All Projects')
+                    ->value(request('project_id'))
+                    ->chunk(20),
+
+                Button::make('Filter Leads')
+                    ->method('filter')
+                    ->type(Color::PRIMARY)
+                    ->icon('filter'),
+            ]),
+
+            // --- LEADS TABLE ---
             Layout::table('leads', [
                 TD::make('name', 'Buyer Name')
                     ->sort()
-                    ->render(fn ($lead) => "<strong>{$lead['name']}</strong>"),
+                    ->render(fn(Lead $lead) => "<strong>{$lead->name}</strong>"),
 
-                TD::make('project', 'Project Interest'),
+                TD::make('project.title', 'Project Interest')
+                    ->render(fn(Lead $lead) => $lead->project->name ?? 'Unknown'),
 
                 TD::make('status', 'Status')
-                    ->render(function ($lead) {
-                        // Applying Brand Colors 
-                        // Amber for urgency (New), Green for success (Booked)
-                        $color = match ($lead['status']) {
-                            'New' => 'text-warning', // Bootstrap warning is close to Amber
-                            'Booked' => 'text-success', // Bootstrap success matches KeyWe Green
-                            default => 'text-muted',
+                    ->sort()
+                    ->render(function (Lead $lead) {
+                        $color = match ($lead->status) {
+                            'New'       => 'text-warning',
+                            'Contacted' => 'text-info',
+                            'Booked'    => 'text-success',
+                            'Lost'      => 'text-danger',
+                            default     => 'text-muted',
                         };
-                        return "<span class='{$color}'>● {$lead['status']}</span>";
+                        return "<span class='{$color}'>● {$lead->status}</span>";
                     }),
 
-                TD::make('time', 'Received'),
+                TD::make('created_at', 'Received')
+                    ->sort()
+                    ->render(fn(Lead $lead) => $lead->created_at->diffForHumans()),
 
-                // Action: View Details (Simulates downloading lead pack)
                 TD::make('Actions')
                     ->align(TD::ALIGN_RIGHT)
-                    ->render(fn ($lead) => ModalToggle::make('View Details')
+                    ->render(fn(Lead $lead) => ModalToggle::make('View Details')
                         ->modal('leadDetailsModal')
                         ->method('markAsContacted')
-                        ->asyncParameters(['lead_id' => $lead['id']]) // Pass ID to modal
+                        ->asyncParameters(['lead_id' => $lead->id])
                         ->icon('eye')
                         ->type(Color::LIGHT)),
             ]),
 
-            // 2. Lead Details Modal
+            // MODAL
             Layout::modal('leadDetailsModal', Layout::rows([
-                // In a real app, these would be populated via the 'async' method
-                Input::make('lead.name')
-                    ->title('Buyer Name')
-                    ->readonly(),
-
-                Input::make('lead.contact')
-                    ->title('Phone Number')
-                    ->readonly()
-                    ->help('Contact strictly within business hours.'),
-
-                TextArea::make('lead.note')
-                    ->title('Buyer Requirements')
-                    ->rows(3)
-                    ->readonly(),
-
-            ]))->title('Buyer Lead Pack')
-               ->applyButton('Mark as Contacted')
-               ->closeButton('Close'),
+                Input::make('lead.name')->title('Buyer Name')->readonly(),
+                Input::make('lead.phone')->title('Phone Number')->readonly(),
+                Input::make('lead.email')->title('Email Address')->readonly(),
+                TextArea::make('lead.message')->title('Buyer Message')->rows(3)->readonly(),
+            ]))
+                ->title('Buyer Lead Pack')
+                ->async('asyncGetLead')
+                ->applyButton('Mark as Contacted')
+                ->closeButton('Close'),
         ];
     }
 
     /**
-     * Handle the "Mark as Contacted" action
+     * Filter submit handler
      */
+    public function filter(Request $request)
+    {
+        $projectId = $request->get('project_id');
+
+        return redirect()->route('platform.builder.leads', [
+            'project_id' => $projectId,
+        ]);
+    }
+
+    public function asyncGetLead(Request $request): array
+    {
+        $lead = Lead::findOrFail($request->get('lead_id'));
+        return ['lead' => $lead];
+    }
+
     public function markAsContacted(Request $request)
     {
-        Toast::info('Lead status updated to "Contacted".');
+        $lead = Lead::findOrFail($request->get('lead_id'));
+        $lead->status = 'Contacted';
+        $lead->save();
+
+        Toast::info('Lead marked as contacted.');
     }
 }

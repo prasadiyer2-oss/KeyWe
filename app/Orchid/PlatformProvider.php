@@ -119,7 +119,8 @@ class PlatformProvider extends OrchidServiceProvider
             ItemPermission::group(__('Builder Controls'))
                 ->addPermission('platform.builder.dashboard', __('Access Builder Dashboard'))
                 ->addPermission('platform.builder.projects', __('Manage Projects (Create/Edit)'))
-                ->addPermission('platform.builder.properties', __('Manage Units/Properties')),
+                ->addPermission('platform.builder.properties', __('Manage Units/Properties'))
+                ->addPermission('platform.builder.leads', __('Manage leads')),
 
             ItemPermission::group(__('Admin Verification'))
                 // 👇 These keys must match the menu() keys exactly!
