@@ -24,5 +24,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             FilterOptionSeeder::class,
         ]);
+        $this->call([
+            UserPreferenceOptionsSeeder::class,
+        ]);
     }
 }
